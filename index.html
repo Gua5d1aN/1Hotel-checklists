@@ -59,8 +59,6 @@ const DT = {
   }
 };
 
-function lsGet(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch(e){return fb;}}
-function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 function deepClone(o){return JSON.parse(JSON.stringify(o));}
 function migrate(cl){
   const u=deepClone(cl);
@@ -68,11 +66,26 @@ function migrate(cl){
   return u;
 }
 
+// ── Supabase helpers
+async function sbFetchConfig(){
+  const res=await fetch(SB_URL+"/rest/v1/checklist_config?select=config&id=eq.1",{headers:HDRS});
+  if(!res.ok) throw new Error("Config fetch failed");
+  const data=await res.json();
+  return data.length>0?migrate(data[0].config):null;
+}
+async function sbSaveConfig(config){
+  const res=await fetch(SB_URL+"/rest/v1/checklist_config",{
+    method:"POST",
+    headers:Object.assign({},HDRS,{"Prefer":"resolution=merge-duplicates"}),
+    body:JSON.stringify({id:1,config:config,updated_at:new Date().toISOString()})
+  });
+  if(!res.ok) throw new Error("Config save failed");
+}
 async function sbInsert(row){
   const res=await fetch(SB_URL+"/rest/v1/checklist_logs",{method:"POST",headers:Object.assign({},HDRS,{"Prefer":"return=minimal"}),body:JSON.stringify(row)});
   if(!res.ok) throw new Error("Insert failed");
 }
-async function sbFetch(){
+async function sbFetchLogs(){
   const res=await fetch(SB_URL+"/rest/v1/checklist_logs?select=*&order=created_at.desc",{headers:HDRS});
   if(!res.ok) throw new Error("Fetch failed");
   return res.json();
@@ -84,8 +97,8 @@ async function uploadPhoto(file,path){
 }
 function toCSV(rows){
   const h=["ID","Submitted At","Name","Location","Section","Shift","Completed","Total","Tasks"];
-  const lines=rows.map(function(r){return [r.id,r.created_at,r.name,r.location,r.section,r.shift,r.completed,r.total,JSON.stringify(r.tasks)].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(",");});
-  return [h.join(",")].concat(lines).join("\n");
+  const lines=rows.map(function(r){return[r.id,r.created_at,r.name,r.location,r.section,r.shift,r.completed,r.total,JSON.stringify(r.tasks)].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(",");});
+  return[h.join(",")].concat(lines).join("\n");
 }
 function downloadCSV(rows){
   const blob=new Blob([toCSV(rows)],{type:"text/csv"});
@@ -187,114 +200,63 @@ function ResultsView(p){
   const [filterShift,setFilterShift]=useState("All");
   const [filterDate,setFilterDate]=useState("All");
   const dateOpts=["All","Today","Last 7 days","Last 30 days"];
-
   function withinDate(log){
     if(filterDate==="All") return true;
-    const d=new Date(log.created_at), now=new Date();
+    const d=new Date(log.created_at),now=new Date();
     if(filterDate==="Today") return d.toDateString()===now.toDateString();
     if(filterDate==="Last 7 days") return (now-d)<7*86400000;
     if(filterDate==="Last 30 days") return (now-d)<30*86400000;
     return true;
   }
-
-  const filtered=p.logs.filter(function(l){
-    return (filterLoc==="All"||l.location===filterLoc)&&(filterShift==="All"||l.shift===filterShift)&&withinDate(l);
-  });
-
+  const filtered=p.logs.filter(function(l){return(filterLoc==="All"||l.location===filterLoc)&&(filterShift==="All"||l.shift===filterShift)&&withinDate(l);});
   const total=filtered.length;
   const fullyComplete=filtered.filter(function(l){return l.completed===l.total;}).length;
   const incomplete=total-fullyComplete;
   const compRate=total?Math.round(fullyComplete/total*100):0;
-
   const bySec={};
-  filtered.forEach(function(l){
-    const k=l.location+" · "+l.section;
-    if(!bySec[k]) bySec[k]={done:0,total:0};
-    bySec[k].total++;
-    if(l.completed===l.total) bySec[k].done++;
-  });
-
+  filtered.forEach(function(l){const k=l.location+" · "+l.section;if(!bySec[k])bySec[k]={done:0,total:0};bySec[k].total++;if(l.completed===l.total)bySec[k].done++;});
   const missedTasks={};
-  filtered.forEach(function(l){
-    (l.tasks||[]).forEach(function(t){
-      if(!t.done) missedTasks[t.task]=(missedTasks[t.task]||0)+1;
-    });
-  });
+  filtered.forEach(function(l){(l.tasks||[]).forEach(function(t){if(!t.done)missedTasks[t.task]=(missedTasks[t.task]||0)+1;});});
   const topMissed=Object.entries(missedTasks).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
-
   if(p.logsLoading) return React.createElement("p",{style:{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}},"Loading…");
-  if(p.logsErr) return React.createElement("p",{style:{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}},"Failed to load. ",React.createElement("button",{style:Object.assign({},st.btnG,{display:"inline",padding:".25rem .75rem"}),onClick:p.onRefresh},"Retry"));
-
+  if(p.logsErr) return React.createElement("p",{style:{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}},"Failed to load.");
   return React.createElement("div",null,
-    // Filters
     React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}},
       React.createElement("button",{style:st.btnG,onClick:p.onRefresh},"↺ Refresh"),
-      React.createElement("select",{style:st.fieldSm,value:filterLoc,onChange:function(e){setFilterLoc(e.target.value);}},
-        React.createElement("option",null,"All"),
-        LOCS.map(function(l){return React.createElement("option",{key:l},l);})
-      ),
-      React.createElement("select",{style:st.fieldSm,value:filterShift,onChange:function(e){setFilterShift(e.target.value);}},
-        React.createElement("option",null,"All"),
-        SHIFTS.map(function(s){return React.createElement("option",{key:s},s);})
-      ),
-      React.createElement("select",{style:st.fieldSm,value:filterDate,onChange:function(e){setFilterDate(e.target.value);}},
-        dateOpts.map(function(d){return React.createElement("option",{key:d},d);})
-      )
+      React.createElement("select",{style:st.fieldSm,value:filterLoc,onChange:function(e){setFilterLoc(e.target.value);}},React.createElement("option",null,"All"),LOCS.map(function(l){return React.createElement("option",{key:l},l);})),
+      React.createElement("select",{style:st.fieldSm,value:filterShift,onChange:function(e){setFilterShift(e.target.value);}},React.createElement("option",null,"All"),SHIFTS.map(function(s){return React.createElement("option",{key:s},s);})),
+      React.createElement("select",{style:st.fieldSm,value:filterDate,onChange:function(e){setFilterDate(e.target.value);}},dateOpts.map(function(d){return React.createElement("option",{key:d},d);}))
     ),
     total===0
-      ? React.createElement("p",{style:{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}},"No submissions match the selected filters.")
-      : React.createElement("div",null,
-          // Stat boxes
-          React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap"}},
-            React.createElement("div",{style:st.statBox},
-              React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#fff"}},total),
-              React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Submissions")
-            ),
-            React.createElement("div",{style:st.statBox},
-              React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#4ade80"}},compRate+"%"),
-              React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Completion rate")
-            ),
-            React.createElement("div",{style:st.statBox},
-              React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:incomplete>0?"#f59e0b":"#4ade80"}},incomplete),
-              React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Incomplete")
-            )
-          ),
-          // By section
-          React.createElement("span",{style:st.sectionLbl},"Completion by Section"),
-          React.createElement("div",{style:{marginBottom:"1.5rem"}},
-            Object.entries(bySec).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(entry){
-              const k=entry[0], v=entry[1];
-              const pct=Math.round(v.done/v.total*100);
-              const barColor=pct===100?"#4ade80":pct>=50?"#f59e0b":"#ef4444";
-              return React.createElement("div",{key:k,style:{marginBottom:".75rem"}},
-                React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:".3rem"}},
-                  React.createElement("span",{style:{color:"#ccc"}},k),
-                  React.createElement("span",{style:{color:barColor}},v.done+"/"+v.total+" · "+pct+"%")
-                ),
-                React.createElement("div",{style:{height:"4px",background:"#1e1e1e",borderRadius:"2px",overflow:"hidden"}},
-                  React.createElement("div",{style:{height:"100%",borderRadius:"2px",width:pct+"%",background:barColor,transition:"width .4s"}})
-                )
-              );
-            })
-          ),
-          // Most missed
-          topMissed.length>0?React.createElement("div",null,
-            React.createElement("span",{style:st.sectionLbl},"Most Missed Tasks"),
-            React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",overflow:"hidden"}},
-              topMissed.map(function(entry,i){
-                return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:".75rem 1rem",borderBottom:i<topMissed.length-1?"1px solid #1e1e1e":"none"}},
-                  React.createElement("span",{style:{fontSize:".8rem",color:"#ccc",flex:"1",marginRight:"1rem"}},entry[0]),
-                  React.createElement("span",{style:{fontSize:".75rem",fontWeight:"600",color:"#f59e0b",flexShrink:"0"}},entry[1]+"x missed")
-                );
-              })
-            )
-          ):null
-        )
+      ?React.createElement("p",{style:{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}},"No submissions match the selected filters.")
+      :React.createElement("div",null,
+        React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap"}},
+          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#fff"}},total),React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Submissions")),
+          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#4ade80"}},compRate+"%"),React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Completion rate")),
+          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:incomplete>0?"#f59e0b":"#4ade80"}},incomplete),React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Incomplete"))
+        ),
+        React.createElement("span",{style:st.sectionLbl},"Completion by Section"),
+        React.createElement("div",{style:{marginBottom:"1.5rem"}},
+          Object.entries(bySec).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(entry){
+            const k=entry[0],v=entry[1],pct=Math.round(v.done/v.total*100),bc=pct===100?"#4ade80":pct>=50?"#f59e0b":"#ef4444";
+            return React.createElement("div",{key:k,style:{marginBottom:".75rem"}},
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:".3rem"}},React.createElement("span",{style:{color:"#ccc"}},k),React.createElement("span",{style:{color:bc}},v.done+"/"+v.total+" · "+pct+"%")),
+              React.createElement("div",{style:{height:"4px",background:"#1e1e1e",borderRadius:"2px",overflow:"hidden"}},React.createElement("div",{style:{height:"100%",borderRadius:"2px",width:pct+"%",background:bc,transition:"width .4s"}}))
+            );
+          })
+        ),
+        topMissed.length>0?React.createElement("div",null,
+          React.createElement("span",{style:st.sectionLbl},"Most Missed Tasks"),
+          React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",overflow:"hidden"}},
+            topMissed.map(function(entry,i){return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:".75rem 1rem",borderBottom:i<topMissed.length-1?"1px solid #1e1e1e":"none"}},React.createElement("span",{style:{fontSize:".8rem",color:"#ccc",flex:"1",marginRight:"1rem"}},entry[0]),React.createElement("span",{style:{fontSize:".75rem",fontWeight:"600",color:"#f59e0b",flexShrink:"0"}},entry[1]+"x missed"));})
+          )
+        ):null
+      )
   );
 }
 
 function App(){
-  const [view,setView]=useState("home");
+  const [view,setView]=useState("loading");
   const [name,setName]=useState("");
   const [loc,setLoc]=useState("");
   const [sec,setSec]=useState("");
@@ -306,7 +268,8 @@ function App(){
   const [photoErr,setPhotoErr]=useState(false);
   const [submitting,setSubmitting]=useState(false);
   const [submitErr,setSubmitErr]=useState(false);
-  const [cls,setCls]=useState(function(){return migrate(lsGet("fhm_cl_v7",deepClone(DT)));});
+  const [cls,setCls]=useState(null);
+  const [configSaving,setConfigSaving]=useState(false);
   const [logs,setLogs]=useState([]);
   const [logsLoading,setLogsLoading]=useState(false);
   const [logsErr,setLogsErr]=useState(false);
@@ -318,10 +281,26 @@ function App(){
   const [eShift,setEShift]=useState("Opening");
   const [expanded,setExpanded]=useState(null);
 
-  const saveCls=function(u){setCls(u);lsSet("fhm_cl_v7",u);};
+  // Load config from Supabase on mount
+  useEffect(function(){
+    sbFetchConfig().then(function(config){
+      setCls(config||deepClone(DT));
+      setView("home");
+    }).catch(function(){
+      setCls(deepClone(DT));
+      setView("home");
+    });
+  },[]);
+
+  const saveCls=function(u){
+    setCls(u);
+    setConfigSaving(true);
+    sbSaveConfig(u).finally(function(){setConfigSaving(false);});
+  };
+
   const fetchLogs=useCallback(async function(){
     setLogsLoading(true);setLogsErr(false);
-    try{setLogs(await sbFetch());}catch(e){setLogsErr(true);}
+    try{setLogs(await sbFetchLogs());}catch(e){setLogsErr(true);}
     setLogsLoading(false);
   },[]);
   useEffect(function(){if(view==="admin"&&(adminTab==="logs"||adminTab==="results"))fetchLogs();},[view,adminTab,fetchLogs]);
@@ -368,8 +347,13 @@ function App(){
   const toggleTaskPhoto=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh][i]=Object.assign({},u[l][sc][sh][i],{requiresPhoto:!u[l][sc][sh][i].requiresPhoto});saveCls(u);};
   const removeTask=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh].splice(i,1);saveCls(u);};
   const addTask=function(l,sc,sh){const u=deepClone(cls);u[l][sc][sh].push({text:"New task",requiresPhoto:false});saveCls(u);};
-  const eSections=STRUCTURE[eLoc]||[];
-  const eTasks=cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
+  const eSections=cls?(STRUCTURE[eLoc]||[]):[];
+  const eTasks=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
+
+  // Loading screen
+  if(view==="loading") return React.createElement("div",{style:Object.assign({},st.page,st.center)},
+    React.createElement("p",{style:{fontSize:".75rem",color:"#444",letterSpacing:".1em",textTransform:"uppercase"}},"Loading…")
+  );
 
   if(view==="home") return (
     <div style={Object.assign({},st.page,st.center)}>
@@ -487,7 +471,10 @@ function App(){
 
         {adminTab==="edit"?(
           <div>
-            <p style={{fontSize:".7rem",color:"#555",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Active tasks are highlighted amber.</p>
+            <p style={{fontSize:".7rem",color:"#555",marginBottom:"1rem"}}>
+              Tap 📷 on a task to require a photo. Changes save to Supabase instantly and apply on all devices.
+              {configSaving?" Saving…":""}
+            </p>
             <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);setESec(STRUCTURE[l][0]);}}/>; })}</div>
             <div style={st.chipRow}>{eSections.map(function(sc){return <Chip key={sc} label={sc} active={eSec===sc} onClick={function(){setESec(sc);}}/>; })}</div>
             <div style={Object.assign({},st.chipRow,{marginBottom:"1rem"})}>{SHIFTS.map(function(sh){return <Chip key={sh} label={sh} active={eShift===sh} onClick={function(){setEShift(sh);}}/>; })}</div>
