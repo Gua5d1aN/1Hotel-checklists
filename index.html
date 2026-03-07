@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="theme-color" content="#0a0a0a"/>
+<title>1 Hotel Melbourne — Section Checklists</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+button,input,select{font-family:inherit}
+::placeholder{color:#404040}
+select option{background:#1a1a1a;color:#fff}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback, useRef } = React;
+
+const SB_URL = "https://xfrspqumcsxwxmjqsalg.supabase.co";
+const SB_KEY = "sb_publishable_3G8P3sjDyfR_7I-ISUiBbA_ahoLxRSq";
+const HDRS = {"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY};
+
+const STRUCTURE = {
+  Kitchen:["Grill","Larder","Pans","Fryer"],
+  FOH:["Floor","Host / Reception","Terrace"],
+  Bar:["Crane Bar","Back Bar","LVL1 Bar"],
+  "In Room Dining":["IRD Runner","Amenities"]
+};
+const LOCS = ["Kitchen","FOH","Bar","In Room Dining"];
+const SHIFTS = ["Opening","Closing"];
+const ADMIN_PW = "1hotel";
+
+const DT = {
+  Kitchen:{
+    Grill:{Opening:[{text:"Light and calibrate grill to temp",requiresPhoto:false},{text:"Clean grill grates and drip trays",requiresPhoto:false},{text:"Check protein par and pull from cool room",requiresPhoto:false},{text:"Set up sauces and seasoning mise en place",requiresPhoto:false},{text:"Review service notes and specials",requiresPhoto:false}],Closing:[{text:"Cool down and brush grill grates",requiresPhoto:false},{text:"Empty and clean drip trays",requiresPhoto:false},{text:"Wrap and store all proteins correctly",requiresPhoto:false},{text:"Wipe down entire grill station",requiresPhoto:false},{text:"Complete section temp log",requiresPhoto:false}]},
+    Larder:{Opening:[{text:"Check and rotate all larder mise en place",requiresPhoto:false},{text:"Portion and label salads and cold starters",requiresPhoto:false},{text:"Confirm garnish stock and prep as needed",requiresPhoto:false},{text:"Check dressings and cold sauces",requiresPhoto:false},{text:"Review covers and allergy flags",requiresPhoto:false}],Closing:[{text:"Wrap and date all open products",requiresPhoto:false},{text:"Clean and sanitise larder benches and boards",requiresPhoto:false},{text:"Store all mise en place correctly",requiresPhoto:false},{text:"Check fridge temps and log",requiresPhoto:false},{text:"Clear ice bath and dry thoroughly",requiresPhoto:false}]},
+    Pans:{Opening:[{text:"Confirm burner function across all rings",requiresPhoto:false},{text:"Set up sauces, stocks and mise en place",requiresPhoto:false},{text:"Check pan and utensil stock",requiresPhoto:false},{text:"Pull and check proteins for service",requiresPhoto:false},{text:"Review daily specials and timing",requiresPhoto:false}],Closing:[{text:"Deglaze and clean all pans",requiresPhoto:false},{text:"Wipe down stove tops and burners",requiresPhoto:false},{text:"Store remaining sauces and stocks correctly",requiresPhoto:false},{text:"Clean and return all utensils",requiresPhoto:false},{text:"Wipe down full station surface",requiresPhoto:false}]},
+    Fryer:{Opening:[{text:"Check oil quality and top up if needed",requiresPhoto:false},{text:"Heat fryers to correct temp and log reading",requiresPhoto:false},{text:"Set up crumbing and battering station",requiresPhoto:false},{text:"Check frozen and fresh product levels",requiresPhoto:false},{text:"Confirm holding equipment is functional",requiresPhoto:false}],Closing:[{text:"Filter or change oil as required",requiresPhoto:false},{text:"Cool fryers fully before covering",requiresPhoto:false},{text:"Clean baskets and exterior thoroughly",requiresPhoto:false},{text:"Dispose of waste oil correctly",requiresPhoto:false},{text:"Complete oil change log",requiresPhoto:false}]}
+  },
+  FOH:{
+    Floor:{Opening:[{text:"Set all tables to restaurant standard",requiresPhoto:false},{text:"Polish glassware and cutlery",requiresPhoto:false},{text:"Check reservations and flag dietary requirements",requiresPhoto:false},{text:"Brief team on specials and 86d items",requiresPhoto:false},{text:"Confirm menus are clean and current",requiresPhoto:false}],Closing:[{text:"Clear, clean and reset all tables",requiresPhoto:false},{text:"Return all glassware and linen to storage",requiresPhoto:false},{text:"Complete section side duties",requiresPhoto:false},{text:"Log any guest feedback or incidents",requiresPhoto:false},{text:"Leave handover notes for next shift",requiresPhoto:false}]},
+    "Host / Reception":{Opening:[{text:"Review full reservation sheet for the day",requiresPhoto:false},{text:"Confirm covers, table allocations and special requests",requiresPhoto:false},{text:"Brief floor team on VIPs and dietary flags",requiresPhoto:false},{text:"Ensure reception area is clean and presentable",requiresPhoto:false},{text:"Test reservation system and phone line",requiresPhoto:false}],Closing:[{text:"Confirm all reservations actioned and noted",requiresPhoto:false},{text:"Update any no-shows or walk-ins in system",requiresPhoto:false},{text:"Leave handover notes for next shift",requiresPhoto:false},{text:"Secure reservation records",requiresPhoto:false},{text:"Tidy and reset reception area",requiresPhoto:false}]},
+    Terrace:{Opening:[{text:"Check weather and confirm terrace is open",requiresPhoto:false},{text:"Set terrace tables and chairs to standard",requiresPhoto:false},{text:"Confirm heaters or umbrellas are operational",requiresPhoto:false},{text:"Check terrace menus are clean and stocked",requiresPhoto:false},{text:"Ensure terrace is swept and clear of debris",requiresPhoto:false}],Closing:[{text:"Clear and stack all terrace furniture",requiresPhoto:false},{text:"Store cushions and linens correctly",requiresPhoto:false},{text:"Secure heaters and umbrellas",requiresPhoto:false},{text:"Sweep terrace and dispose of waste",requiresPhoto:false},{text:"Lock terrace access",requiresPhoto:false}]}
+  },
+  Bar:{
+    "Crane Bar":{Opening:[{text:"Restock bar fridge to par",requiresPhoto:false},{text:"Check spirits, liqueurs and garnish levels",requiresPhoto:false},{text:"Prep fresh juices and house syrups",requiresPhoto:false},{text:"Polish all glassware",requiresPhoto:false},{text:"Test bar equipment including taps, blenders and ice machine",requiresPhoto:false}],Closing:[{text:"Discard perishable garnishes",requiresPhoto:false},{text:"Wrap and refrigerate juices and syrups",requiresPhoto:false},{text:"Wipe down full bar surface and taps",requiresPhoto:false},{text:"Cash up bar POS and reconcile",requiresPhoto:false},{text:"Complete waste log",requiresPhoto:false}]},
+    "Back Bar":{Opening:[{text:"Check back bar stock levels and restock",requiresPhoto:false},{text:"Confirm all spirits and liqueurs are labelled",requiresPhoto:false},{text:"Ensure back bar fridge is at correct temp",requiresPhoto:false},{text:"Restock bar consumables including straws, napkins and picks",requiresPhoto:false},{text:"Clean and organise back bar storage",requiresPhoto:false}],Closing:[{text:"Lock spirits fridge and back bar storage",requiresPhoto:false},{text:"Restock for next shift where possible",requiresPhoto:false},{text:"Wipe down all back bar surfaces",requiresPhoto:false},{text:"Reconcile any stock variances",requiresPhoto:false},{text:"Secure and lock back bar area",requiresPhoto:false}]},
+    "LVL1 Bar":{Opening:[{text:"Restock LVL1 bar fridge to par",requiresPhoto:false},{text:"Check spirit and mixer levels",requiresPhoto:false},{text:"Set up bar snacks and garnish station",requiresPhoto:false},{text:"Polish glassware and set bar to standard",requiresPhoto:false},{text:"Test POS and confirm menu is current",requiresPhoto:false}],Closing:[{text:"Clear and clean full bar top",requiresPhoto:false},{text:"Wrap and store all perishables",requiresPhoto:false},{text:"Cash up LVL1 POS",requiresPhoto:false},{text:"Lock bar fridges and spirit storage",requiresPhoto:false},{text:"Complete end-of-shift handover note",requiresPhoto:false}]}
+  },
+  "In Room Dining":{
+    "IRD Runner":{Opening:[{text:"Check tray setup and linen stock",requiresPhoto:false},{text:"Confirm delivery equipment is clean and ready",requiresPhoto:false},{text:"Review incoming orders for the shift",requiresPhoto:false},{text:"Confirm lift access and floor coverage plan",requiresPhoto:false},{text:"Brief team on menu updates or item availability",requiresPhoto:false}],Closing:[{text:"Collect all outstanding trays from guest floors",requiresPhoto:false},{text:"Log any unreturned items or breakages",requiresPhoto:false},{text:"Store trays and equipment correctly",requiresPhoto:false},{text:"Complete shift order log",requiresPhoto:false},{text:"Leave handover notes for overnight team",requiresPhoto:false}]},
+    Amenities:{Opening:[{text:"Check amenity and condiment stock levels",requiresPhoto:false},{text:"Restock trays and replenish supplies",requiresPhoto:false},{text:"Confirm presentation standards are met",requiresPhoto:false},{text:"Check expiry dates on all packaged items",requiresPhoto:false},{text:"Review any special amenity requests for today",requiresPhoto:false}],Closing:[{text:"Restock amenity storage for next shift",requiresPhoto:false},{text:"Dispose of any expired items",requiresPhoto:false},{text:"Clean and organise amenity storage area",requiresPhoto:false},{text:"Log any low-stock items for ordering",requiresPhoto:false},{text:"Secure amenity storage",requiresPhoto:false}]}
+  }
+};
+
+function lsGet(k,fb){try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch(e){return fb;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function deepClone(o){return JSON.parse(JSON.stringify(o));}
+function migrate(cl){
+  const u=deepClone(cl);
+  LOCS.forEach(function(l){Object.keys(u[l]||{}).forEach(function(sc){SHIFTS.forEach(function(sh){if(u[l][sc]&&u[l][sc][sh]){u[l][sc][sh]=u[l][sc][sh].map(function(t){return typeof t==="string"?{text:t,requiresPhoto:false}:t;});}});});});
+  return u;
+}
+
+async function sbInsert(row){
+  const res=await fetch(SB_URL+"/rest/v1/checklist_logs",{method:"POST",headers:Object.assign({},HDRS,{"Prefer":"return=minimal"}),body:JSON.stringify(row)});
+  if(!res.ok) throw new Error("Insert failed");
+}
+async function sbFetch(){
+  const res=await fetch(SB_URL+"/rest/v1/checklist_logs?select=*&order=created_at.desc",{headers:HDRS});
+  if(!res.ok) throw new Error("Fetch failed");
+  return res.json();
+}
+async function uploadPhoto(file,path){
+  const res=await fetch(SB_URL+"/storage/v1/object/checklist-photos/"+path,{method:"POST",headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":file.type,"Cache-Control":"3600"},body:file});
+  if(!res.ok) throw new Error("Upload failed");
+  return SB_URL+"/storage/v1/object/public/checklist-photos/"+path;
+}
+function toCSV(rows){
+  const h=["ID","Submitted At","Name","Location","Section","Shift","Completed","Total","Tasks"];
+  const lines=rows.map(function(r){return [r.id,r.created_at,r.name,r.location,r.section,r.shift,r.completed,r.total,JSON.stringify(r.tasks)].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(",");});
+  return [h.join(",")].concat(lines).join("\n");
+}
+function downloadCSV(rows){
+  const blob=new Blob([toCSV(rows)],{type:"text/csv"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;a.download="checklist_logs_"+new Date().toISOString().slice(0,10)+".csv";a.click();
+  URL.revokeObjectURL(url);
+}
+
+const st={
+  page:{minHeight:"100vh",background:"#0a0a0a",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"},
+  center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem"},
+  col:{display:"flex",flexDirection:"column",padding:"2rem 1.25rem"},
+  card:{width:"100%",maxWidth:"360px"},
+  inner:{maxWidth:"360px",width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",flex:"1"},
+  adminWrap:{maxWidth:"640px",width:"100%",margin:"0 auto"},
+  eyebrow:{fontSize:".65rem",letterSpacing:".15em",textTransform:"uppercase",color:"#404040",marginBottom:".4rem",textAlign:"center"},
+  heading:{fontSize:"1.5rem",fontWeight:"600",textAlign:"center",marginBottom:"2rem"},
+  lbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",display:"block",marginBottom:".5rem"},
+  field:{width:"100%",background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:".875rem 1rem",color:"#fff",fontSize:".9rem",fontFamily:"inherit",outline:"none"},
+  fieldSm:{background:"#141414",border:"1px solid #222",borderRadius:".75rem",padding:".5rem .75rem",color:"#fff",fontSize:".8rem",fontFamily:"inherit",outline:"none",flex:"1"},
+  grid2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".5rem"},
+  pillBase:{width:"100%",padding:".875rem .75rem",borderRadius:".875rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #222",background:"#141414",color:"#666",cursor:"pointer",textAlign:"center"},
+  pillOn:{background:"#fff",color:"#000",borderColor:"#fff"},
+  btnP:{width:"100%",padding:"1rem",borderRadius:".875rem",background:"#fff",color:"#000",fontSize:".875rem",fontWeight:"600",border:"none",cursor:"pointer"},
+  btnG:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #222",background:"transparent",color:"#555",fontSize:".8rem",cursor:"pointer"},
+  btnDl:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #2a5c2a",background:"transparent",color:"#4ade80",fontSize:".8rem",cursor:"pointer"},
+  backBtn:{background:"none",border:"none",color:"#444",fontSize:".85rem",cursor:"pointer",padding:".25rem 0",textAlign:"left",display:"block",marginBottom:"1.5rem"},
+  stack:{display:"flex",flexDirection:"column",gap:".75rem"},
+  pbar:{height:"3px",background:"#1e1e1e",borderRadius:"2px",overflow:"hidden",marginBottom:"1.25rem"},
+  taskBtn:{width:"100%",display:"flex",alignItems:"center",gap:"1rem",padding:"1rem",borderRadius:".875rem",border:"1px solid #222",background:"#141414",cursor:"pointer",textAlign:"left"},
+  taskBtnDone:{background:"#0d0d0d",borderColor:"#1a1a1a"},
+  circle:{width:"1.5rem",height:"1.5rem",borderRadius:"50%",border:"2px solid #444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:"0"},
+  circleOn:{background:"#fff",borderColor:"#fff"},
+  sicon:{width:"4rem",height:"4rem",borderRadius:"50%",background:"#141414",border:"1px solid #222",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",marginBottom:"1.5rem"},
+  adminLink:{marginTop:"2.5rem",fontSize:".7rem",color:"#1e1e1e",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"},
+  tabRow:{display:"flex",gap:".5rem",marginBottom:"1.5rem",flexWrap:"wrap"},
+  tab:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #222",background:"#141414",color:"#555",cursor:"pointer"},
+  tabOn:{background:"#fff",color:"#000",borderColor:"#fff"},
+  logCard:{width:"100%",background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",cursor:"pointer",textAlign:"left",marginBottom:".5rem"},
+  logExpand:{marginTop:".75rem",paddingTop:".75rem",borderTop:"1px solid #1e1e1e"},
+  chipRow:{display:"flex",flexWrap:"wrap",gap:".375rem",marginBottom:".75rem"},
+  chip:{padding:".375rem .75rem",borderRadius:".5rem",fontSize:".75rem",fontWeight:"500",border:"1px solid #222",background:"#141414",color:"#555",cursor:"pointer"},
+  chipOn:{background:"#fff",color:"#000",borderColor:"#fff"},
+  editRow:{display:"flex",gap:".5rem",alignItems:"center",marginBottom:".5rem"},
+  editInput:{flex:"1",background:"#141414",border:"1px solid #222",borderRadius:".625rem",padding:".75rem",fontSize:".875rem",color:"#fff",fontFamily:"inherit",outline:"none"},
+  rmBtn:{background:"none",border:"none",color:"#333",fontSize:"1.5rem",cursor:"pointer",width:"2rem",flexShrink:"0",lineHeight:"1"},
+  addBtn:{width:"100%",padding:".875rem",borderRadius:".875rem",border:"1px dashed #282828",background:"transparent",color:"#444",fontSize:".875rem",cursor:"pointer"},
+  rowSB:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.75rem"},
+  pctRow:{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:"#444",marginBottom:".5rem"},
+  tasksWrap:{flex:"1",marginBottom:"1.25rem"},
+  uploadBtn:{background:"transparent",border:"1px solid #f59e0b",color:"#f59e0b",borderRadius:".625rem",padding:".375rem .875rem",fontSize:".75rem",cursor:"pointer",fontFamily:"inherit"},
+  photoToggle:{background:"none",border:"1px solid #333",borderRadius:".5rem",padding:".35rem .5rem",fontSize:".85rem",cursor:"pointer",flexShrink:"0"},
+  photoToggleOn:{borderColor:"#f59e0b",background:"rgba(245,158,11,.12)"},
+  statBox:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem 1.25rem",flex:"1",minWidth:"100px"},
+  sectionLbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".75rem",display:"block"},
+};
+
+function Pill(p){return React.createElement("button",{style:Object.assign({},st.pillBase,p.active?st.pillOn:{}),onClick:p.onClick},p.label);}
+function TabBtn(p){return React.createElement("button",{style:Object.assign({},st.tab,p.active?st.tabOn:{}),onClick:p.onClick},p.label);}
+function Chip(p){return React.createElement("button",{style:Object.assign({},st.chip,p.active?st.chipOn:{}),onClick:p.onClick},p.label);}
+function CheckTick(){return React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",stroke:"#000",strokeWidth:"3",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
+function CheckBig(p){return React.createElement("svg",{width:"28",height:"28",viewBox:"0 0 24 24",fill:"none",stroke:p.color,strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
+
+function TaskRow(p){
+  const fileRef=useRef(null);
+  const isUploading=p.uploadingIdx===p.idx;
+  const needsPhoto=p.task.requiresPhoto;
+  const hasPhoto=!!p.photoUrl;
+  const isFullyDone=p.isChecked&&(!needsPhoto||hasPhoto);
+  function handleChange(e){if(e.target.files&&e.target.files[0])p.onUpload(e.target.files[0],p.idx);}
+  return React.createElement("div",{style:{marginBottom:".5rem"}},
+    React.createElement("button",{style:Object.assign({},st.taskBtn,isFullyDone?st.taskBtnDone:{}),onClick:p.onToggle},
+      React.createElement("div",{style:Object.assign({},st.circle,p.isChecked?st.circleOn:{})},p.isChecked?React.createElement(CheckTick,null):null),
+      React.createElement("span",{style:{fontSize:".875rem",lineHeight:"1.45",flex:"1",textAlign:"left",color:isFullyDone?"#404040":"#e0e0e0",textDecoration:isFullyDone?"line-through":"none"}},p.task.text),
+      needsPhoto?React.createElement("span",{style:{fontSize:".7rem",flexShrink:"0",color:hasPhoto?"#4ade80":"#f59e0b"}},"📷"):null
+    ),
+    p.isChecked&&needsPhoto?React.createElement("div",{style:{paddingLeft:"3.5rem",marginTop:".3rem"}},
+      hasPhoto
+        ?React.createElement("span",{style:{fontSize:".75rem",color:"#4ade80"}},"✓ Photo uploaded")
+        :React.createElement("div",null,
+          React.createElement("button",{style:st.uploadBtn,onClick:function(){if(fileRef.current)fileRef.current.click();},disabled:isUploading},isUploading?"Uploading…":"📷 Add required photo"),
+          React.createElement("input",{ref:fileRef,type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:handleChange})
+        )
+    ):null
+  );
+}
+
+function EditTaskRow(p){
+  return React.createElement("div",{style:st.editRow},
+    React.createElement("input",{style:st.editInput,value:p.task.text,onChange:function(e){p.onUpdateText(p.idx,e.target.value);}}),
+    React.createElement("button",{style:Object.assign({},st.photoToggle,p.task.requiresPhoto?st.photoToggleOn:{}),onClick:function(){p.onTogglePhoto(p.idx);},title:p.task.requiresPhoto?"Photo required — click to remove":"Click to require photo"},"📷"),
+    React.createElement("button",{style:st.rmBtn,onClick:function(){p.onRemove(p.idx);}},"×")
+  );
+}
+
+function ResultsView(p){
+  const [filterLoc,setFilterLoc]=useState("All");
+  const [filterShift,setFilterShift]=useState("All");
+  const [filterDate,setFilterDate]=useState("All");
+  const dateOpts=["All","Today","Last 7 days","Last 30 days"];
+
+  function withinDate(log){
+    if(filterDate==="All") return true;
+    const d=new Date(log.created_at), now=new Date();
+    if(filterDate==="Today") return d.toDateString()===now.toDateString();
+    if(filterDate==="Last 7 days") return (now-d)<7*86400000;
+    if(filterDate==="Last 30 days") return (now-d)<30*86400000;
+    return true;
+  }
+
+  const filtered=p.logs.filter(function(l){
+    return (filterLoc==="All"||l.location===filterLoc)&&(filterShift==="All"||l.shift===filterShift)&&withinDate(l);
+  });
+
+  const total=filtered.length;
+  const fullyComplete=filtered.filter(function(l){return l.completed===l.total;}).length;
+  const incomplete=total-fullyComplete;
+  const compRate=total?Math.round(fullyComplete/total*100):0;
+
+  const bySec={};
+  filtered.forEach(function(l){
+    const k=l.location+" · "+l.section;
+    if(!bySec[k]) bySec[k]={done:0,total:0};
+    bySec[k].total++;
+    if(l.completed===l.total) bySec[k].done++;
+  });
+
+  const missedTasks={};
+  filtered.forEach(function(l){
+    (l.tasks||[]).forEach(function(t){
+      if(!t.done) missedTasks[t.task]=(missedTasks[t.task]||0)+1;
+    });
+  });
+  const topMissed=Object.entries(missedTasks).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
+
+  if(p.logsLoading) return React.createElement("p",{style:{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}},"Loading…");
+  if(p.logsErr) return React.createElement("p",{style:{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}},"Failed to load. ",React.createElement("button",{style:Object.assign({},st.btnG,{display:"inline",padding:".25rem .75rem"}),onClick:p.onRefresh},"Retry"));
+
+  return React.createElement("div",null,
+    // Filters
+    React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}},
+      React.createElement("button",{style:st.btnG,onClick:p.onRefresh},"↺ Refresh"),
+      React.createElement("select",{style:st.fieldSm,value:filterLoc,onChange:function(e){setFilterLoc(e.target.value);}},
+        React.createElement("option",null,"All"),
+        LOCS.map(function(l){return React.createElement("option",{key:l},l);})
+      ),
+      React.createElement("select",{style:st.fieldSm,value:filterShift,onChange:function(e){setFilterShift(e.target.value);}},
+        React.createElement("option",null,"All"),
+        SHIFTS.map(function(s){return React.createElement("option",{key:s},s);})
+      ),
+      React.createElement("select",{style:st.fieldSm,value:filterDate,onChange:function(e){setFilterDate(e.target.value);}},
+        dateOpts.map(function(d){return React.createElement("option",{key:d},d);})
+      )
+    ),
+    total===0
+      ? React.createElement("p",{style:{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}},"No submissions match the selected filters.")
+      : React.createElement("div",null,
+          // Stat boxes
+          React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap"}},
+            React.createElement("div",{style:st.statBox},
+              React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#fff"}},total),
+              React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Submissions")
+            ),
+            React.createElement("div",{style:st.statBox},
+              React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#4ade80"}},compRate+"%"),
+              React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Completion rate")
+            ),
+            React.createElement("div",{style:st.statBox},
+              React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:incomplete>0?"#f59e0b":"#4ade80"}},incomplete),
+              React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Incomplete")
+            )
+          ),
+          // By section
+          React.createElement("span",{style:st.sectionLbl},"Completion by Section"),
+          React.createElement("div",{style:{marginBottom:"1.5rem"}},
+            Object.entries(bySec).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(entry){
+              const k=entry[0], v=entry[1];
+              const pct=Math.round(v.done/v.total*100);
+              const barColor=pct===100?"#4ade80":pct>=50?"#f59e0b":"#ef4444";
+              return React.createElement("div",{key:k,style:{marginBottom:".75rem"}},
+                React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:".3rem"}},
+                  React.createElement("span",{style:{color:"#ccc"}},k),
+                  React.createElement("span",{style:{color:barColor}},v.done+"/"+v.total+" · "+pct+"%")
+                ),
+                React.createElement("div",{style:{height:"4px",background:"#1e1e1e",borderRadius:"2px",overflow:"hidden"}},
+                  React.createElement("div",{style:{height:"100%",borderRadius:"2px",width:pct+"%",background:barColor,transition:"width .4s"}})
+                )
+              );
+            })
+          ),
+          // Most missed
+          topMissed.length>0?React.createElement("div",null,
+            React.createElement("span",{style:st.sectionLbl},"Most Missed Tasks"),
+            React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",overflow:"hidden"}},
+              topMissed.map(function(entry,i){
+                return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:".75rem 1rem",borderBottom:i<topMissed.length-1?"1px solid #1e1e1e":"none"}},
+                  React.createElement("span",{style:{fontSize:".8rem",color:"#ccc",flex:"1",marginRight:"1rem"}},entry[0]),
+                  React.createElement("span",{style:{fontSize:".75rem",fontWeight:"600",color:"#f59e0b",flexShrink:"0"}},entry[1]+"x missed")
+                );
+              })
+            )
+          ):null
+        )
+  );
+}
+
+function App(){
+  const [view,setView]=useState("home");
+  const [name,setName]=useState("");
+  const [loc,setLoc]=useState("");
+  const [sec,setSec]=useState("");
+  const [shift,setShift]=useState("");
+  const [tasks,setTasks]=useState([]);
+  const [checked,setChecked]=useState([]);
+  const [photos,setPhotos]=useState([]);
+  const [uploadingIdx,setUploadingIdx]=useState(-1);
+  const [photoErr,setPhotoErr]=useState(false);
+  const [submitting,setSubmitting]=useState(false);
+  const [submitErr,setSubmitErr]=useState(false);
+  const [cls,setCls]=useState(function(){return migrate(lsGet("fhm_cl_v7",deepClone(DT)));});
+  const [logs,setLogs]=useState([]);
+  const [logsLoading,setLogsLoading]=useState(false);
+  const [logsErr,setLogsErr]=useState(false);
+  const [adminPw,setAdminPw]=useState("");
+  const [adminErr,setAdminErr]=useState(false);
+  const [adminTab,setAdminTab]=useState("logs");
+  const [eLoc,setELoc]=useState("Kitchen");
+  const [eSec,setESec]=useState("Grill");
+  const [eShift,setEShift]=useState("Opening");
+  const [expanded,setExpanded]=useState(null);
+
+  const saveCls=function(u){setCls(u);lsSet("fhm_cl_v7",u);};
+  const fetchLogs=useCallback(async function(){
+    setLogsLoading(true);setLogsErr(false);
+    try{setLogs(await sbFetch());}catch(e){setLogsErr(true);}
+    setLogsLoading(false);
+  },[]);
+  useEffect(function(){if(view==="admin"&&(adminTab==="logs"||adminTab==="results"))fetchLogs();},[view,adminTab,fetchLogs]);
+
+  const taskDone=function(i){return checked[i]&&(!tasks[i]||!tasks[i].requiresPhoto||!!photos[i]);};
+  const completed=tasks.filter(function(_,i){return taskDone(i);}).length;
+  const pct=tasks.length?Math.round(completed/tasks.length*100):0;
+  const allDone=tasks.length>0&&completed===tasks.length;
+  const unticked=tasks.filter(function(_,i){return !checked[i];}).length;
+  const photoNeeded=tasks.filter(function(t,i){return t.requiresPhoto&&checked[i]&&!photos[i];}).length;
+  const btnLabel=allDone?"Submit Checklist ✓":unticked>0?unticked+" task"+(unticked!==1?"s":"")+" remaining":photoNeeded+" photo"+(photoNeeded!==1?"s":"")+" required";
+
+  const resetHome=function(){setLoc("");setSec("");setShift("");setName("");setSubmitErr(false);setPhotoErr(false);setView("home");};
+  const startChecklist=function(){
+    const t=cls[loc]&&cls[loc][sec]&&cls[loc][sec][shift]?cls[loc][sec][shift]:[];
+    setTasks(t);setChecked(new Array(t.length).fill(false));setPhotos(new Array(t.length).fill(null));
+    setSubmitErr(false);setPhotoErr(false);setView("checklist");
+  };
+  const toggle=function(i){setChecked(function(prev){return prev.map(function(v,idx){return idx===i?!v:v;});});};
+  const handlePhotoUpload=async function(file,idx){
+    setUploadingIdx(idx);setPhotoErr(false);
+    try{
+      const ext=file.name.split(".").pop()||"jpg";
+      const path=[Date.now(),loc,sec,shift,idx].join("_").replace(/[^a-zA-Z0-9_]/g,"_")+"."+ext;
+      const url=await uploadPhoto(file,path);
+      setPhotos(function(prev){return prev.map(function(p,i){return i===idx?url:p;});});
+    }catch(e){setPhotoErr(true);}
+    setUploadingIdx(-1);
+  };
+  const submitChecklist=async function(){
+    setSubmitting(true);setSubmitErr(false);
+    try{
+      await sbInsert({name:name.trim(),location:loc,section:sec,shift:shift,completed:completed,total:tasks.length,
+        tasks:tasks.map(function(t,i){return{task:t.text,done:checked[i],requiresPhoto:t.requiresPhoto,photoUrl:photos[i]||null};})
+      });
+      setView("success");
+    }catch(e){setSubmitErr(true);}
+    setSubmitting(false);
+  };
+  const tryLogin=function(){
+    if(adminPw===ADMIN_PW){setView("admin");setAdminPw("");setAdminErr(false);}else setAdminErr(true);
+  };
+  const updateTaskText=function(l,sc,sh,i,text){const u=deepClone(cls);u[l][sc][sh][i]=Object.assign({},u[l][sc][sh][i],{text:text});saveCls(u);};
+  const toggleTaskPhoto=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh][i]=Object.assign({},u[l][sc][sh][i],{requiresPhoto:!u[l][sc][sh][i].requiresPhoto});saveCls(u);};
+  const removeTask=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh].splice(i,1);saveCls(u);};
+  const addTask=function(l,sc,sh){const u=deepClone(cls);u[l][sc][sh].push({text:"New task",requiresPhoto:false});saveCls(u);};
+  const eSections=STRUCTURE[eLoc]||[];
+  const eTasks=cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
+
+  if(view==="home") return (
+    <div style={Object.assign({},st.page,st.center)}>
+      <div style={st.card}>
+        <p style={st.eyebrow}>1 Hotel Melbourne</p>
+        <h1 style={st.heading}>Section Checklists</h1>
+        <div style={st.stack}>
+          <div><label style={st.lbl}>Your Name</label><input style={st.field} placeholder="Enter your name" value={name} onChange={function(e){setName(e.target.value);}}/></div>
+          <div><label style={st.lbl}>Location</label><div style={st.grid2}>{LOCS.map(function(l){return <Pill key={l} label={l} active={loc===l} onClick={function(){setLoc(l);setSec("");}}/>; })}</div></div>
+          {loc?<div><label style={st.lbl}>Section</label><div style={st.grid2}>{STRUCTURE[loc].map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);}}/>; })}</div></div>:null}
+          {sec?<div><label style={st.lbl}>Shift</label><div style={st.grid2}>{SHIFTS.map(function(sh){return <Pill key={sh} label={sh} active={shift===sh} onClick={function(){setShift(sh);}}/>; })}</div></div>:null}
+          <button style={Object.assign({},st.btnP,{opacity:(!name.trim()||!loc||!sec||!shift)?0.25:1})} disabled={!name.trim()||!loc||!sec||!shift} onClick={startChecklist}>Start Checklist →</button>
+        </div>
+        <button style={st.adminLink} onClick={function(){setView("adminLogin");}}>Admin</button>
+      </div>
+    </div>
+  );
+
+  if(view==="checklist") return (
+    <div style={Object.assign({},st.page,st.col)}>
+      <div style={st.inner}>
+        <button style={st.backBtn} onClick={resetHome}>← Back</button>
+        <p style={{fontSize:".7rem",letterSpacing:".1em",textTransform:"uppercase",color:"#555",marginBottom:".3rem"}}>{name} · {loc} · {sec}</p>
+        <h2 style={{fontSize:"1.3rem",fontWeight:"600",marginBottom:"1.25rem"}}>{shift} Checklist</h2>
+        <div style={st.pctRow}><span>{completed} of {tasks.length} complete</span><span>{pct}%</span></div>
+        <div style={st.pbar}><div style={{height:"100%",background:"#fff",borderRadius:"2px",width:pct+"%",transition:"width .4s"}}/></div>
+        <div style={st.tasksWrap}>
+          {tasks.map(function(task,i){return <TaskRow key={i} task={task} idx={i} isChecked={checked[i]} photoUrl={photos[i]} onToggle={function(){toggle(i);}} onUpload={handlePhotoUpload} uploadingIdx={uploadingIdx}/>; })}
+        </div>
+        {photoErr?<p style={{fontSize:".75rem",color:"#ef4444",marginBottom:".5rem",textAlign:"center"}}>Photo upload failed — check connection and try again.</p>:null}
+        {submitErr?<p style={{fontSize:".75rem",color:"#ef4444",marginBottom:".5rem",textAlign:"center"}}>Submission failed — check connection and try again.</p>:null}
+        <button style={Object.assign({},st.btnP,{opacity:(!allDone||submitting)?0.3:1})} disabled={!allDone||submitting} onClick={submitChecklist}>{submitting?"Submitting…":btnLabel}</button>
+      </div>
+    </div>
+  );
+
+  if(view==="success") return (
+    <div style={Object.assign({},st.page,st.center)}>
+      <div style={Object.assign({},st.card,{textAlign:"center"})}>
+        <div style={st.sicon}><CheckBig color="#fff"/></div>
+        <h2 style={{fontSize:"1.5rem",fontWeight:"600",marginBottom:".5rem"}}>All done.</h2>
+        <p style={{fontSize:".875rem",color:"#555",marginBottom:"2rem"}}>{shift} checklist for {sec} ({loc}) submitted by {name}.</p>
+        <button style={st.btnP} onClick={resetHome}>New Checklist</button>
+      </div>
+    </div>
+  );
+
+  if(view==="adminLogin") return (
+    <div style={Object.assign({},st.page,st.center)}>
+      <div style={st.card}>
+        <button style={st.backBtn} onClick={function(){setView("home");setAdminPw("");setAdminErr(false);}}>← Back</button>
+        <h2 style={{fontSize:"1.3rem",fontWeight:"600",marginBottom:"1.5rem"}}>Admin Access</h2>
+        <input type="password" style={Object.assign({},st.field,{marginBottom:".75rem"})} placeholder="Password" value={adminPw}
+          onChange={function(e){setAdminPw(e.target.value);setAdminErr(false);}}
+          onKeyDown={function(e){if(e.key==="Enter")tryLogin();}}
+        />
+        {adminErr?<p style={{fontSize:".75rem",color:"#ef4444",marginBottom:".75rem"}}>Incorrect password.</p>:null}
+        <button style={st.btnP} onClick={tryLogin}>Enter</button>
+      </div>
+    </div>
+  );
+
+  if(view==="admin") return (
+    <div style={Object.assign({},st.page,st.col)}>
+      <div style={st.adminWrap}>
+        <div style={st.rowSB}>
+          <button style={Object.assign({},st.backBtn,{marginBottom:"0"})} onClick={function(){setView("home");}}>← Exit</button>
+          <span style={{fontSize:".9rem",fontWeight:"600"}}>Admin</span>
+          <div style={{width:"3rem"}}/>
+        </div>
+        <div style={st.tabRow}>
+          <TabBtn label="Submission Log" active={adminTab==="logs"} onClick={function(){setAdminTab("logs");}}/>
+          <TabBtn label="Results" active={adminTab==="results"} onClick={function(){setAdminTab("results");}}/>
+          <TabBtn label="Edit Checklists" active={adminTab==="edit"} onClick={function(){setAdminTab("edit");}}/>
+        </div>
+
+        {adminTab==="results"?<ResultsView logs={logs} logsLoading={logsLoading} logsErr={logsErr} onRefresh={fetchLogs}/>:null}
+
+        {adminTab==="logs"?(
+          <div>
+            <div style={{display:"flex",gap:".5rem",marginBottom:"1rem"}}>
+              <button style={st.btnDl} onClick={function(){downloadCSV(logs);}} disabled={logs.length===0}>↓ Download CSV</button>
+              <button style={st.btnG} onClick={fetchLogs}>↺ Refresh</button>
+            </div>
+            {logsLoading?<p style={{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}}>Loading…</p>
+            :logsErr?<p style={{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}}>Failed to load. Check connection.</p>
+            :logs.length===0?<p style={{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}}>No submissions yet.</p>
+            :logs.map(function(log){return(
+              <div key={log.id} style={st.logCard} onClick={function(){setExpanded(expanded===log.id?null:log.id);}}>
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+                  <div>
+                    <p style={{fontWeight:"500",fontSize:".875rem"}}>{log.name}</p>
+                    <p style={{fontSize:".7rem",color:"#555",marginTop:".2rem"}}>{log.location} · {log.section} · {log.shift}</p>
+                  </div>
+                  <div style={{textAlign:"right",flexShrink:"0",marginLeft:"1rem"}}>
+                    <p style={{fontSize:".7rem",color:"#444"}}>{new Date(log.created_at).toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"})}</p>
+                    <p style={{fontSize:".7rem",fontWeight:"500",marginTop:".2rem",color:log.completed===log.total?"#4ade80":"#f59e0b"}}>{log.completed}/{log.total}</p>
+                  </div>
+                </div>
+                {expanded===log.id?(
+                  <div style={st.logExpand}>
+                    {(log.tasks||[]).map(function(t,i){return(
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:".5rem",fontSize:".75rem",marginBottom:".375rem",color:t.done?"#444":"#f59e0b"}}>
+                        <span>{t.done?"✓":"○"}</span>
+                        <span style={t.done?{textDecoration:"line-through"}:{}}>{t.task}</span>
+                        {t.photoUrl?<a href={t.photoUrl} target="_blank" rel="noreferrer" style={{color:"#60a5fa",marginLeft:"auto",flexShrink:"0"}}>📷 view</a>:null}
+                      </div>
+                    );})}
+                  </div>
+                ):null}
+              </div>
+            );})}
+          </div>
+        ):null}
+
+        {adminTab==="edit"?(
+          <div>
+            <p style={{fontSize:".7rem",color:"#555",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Active tasks are highlighted amber.</p>
+            <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);setESec(STRUCTURE[l][0]);}}/>; })}</div>
+            <div style={st.chipRow}>{eSections.map(function(sc){return <Chip key={sc} label={sc} active={eSec===sc} onClick={function(){setESec(sc);}}/>; })}</div>
+            <div style={Object.assign({},st.chipRow,{marginBottom:"1rem"})}>{SHIFTS.map(function(sh){return <Chip key={sh} label={sh} active={eShift===sh} onClick={function(){setEShift(sh);}}/>; })}</div>
+            <div style={{marginBottom:".75rem"}}>
+              {eTasks.map(function(task,i){return <EditTaskRow key={i} task={task} idx={i}
+                onUpdateText={function(idx,text){updateTaskText(eLoc,eSec,eShift,idx,text);}}
+                onTogglePhoto={function(idx){toggleTaskPhoto(eLoc,eSec,eShift,idx);}}
+                onRemove={function(idx){removeTask(eLoc,eSec,eShift,idx);}}
+              />; })}
+            </div>
+            <button style={st.addBtn} onClick={function(){addTask(eLoc,eSec,eShift);}}>+ Add task</button>
+          </div>
+        ):null}
+      </div>
+    </div>
+  );
+
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
+</script>
+</body>
+</html>
