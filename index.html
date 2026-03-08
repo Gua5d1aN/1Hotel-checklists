@@ -6,10 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="theme-color" content="#0a0a0a"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="Checklists"/>
+<meta name="apple-mobile-web-app-title" content="Mise"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
-<title>1 Hotel Melbourne — Section Checklists</title>
+<title>Mise</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
@@ -122,13 +122,13 @@ const st={
   card:{width:"100%",maxWidth:"360px"},
   inner:{maxWidth:"360px",width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",flex:"1"},
   adminWrap:{maxWidth:"640px",width:"100%",margin:"0 auto"},
-  eyebrow:{fontSize:".65rem",letterSpacing:".15em",textTransform:"uppercase",color:"#404040",marginBottom:".4rem",textAlign:"center"},
+  eyebrow:{fontSize:"1rem",letterSpacing:".2em",textTransform:"uppercase",color:"#ffffff",marginBottom:".4rem",textAlign:"center",fontWeight:"600"},
   heading:{fontSize:"1.5rem",fontWeight:"600",textAlign:"center",marginBottom:"2rem"},
-  lbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",display:"block",marginBottom:".5rem"},
-  field:{width:"100%",background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:".875rem 1rem",color:"#fff",fontSize:".9rem",fontFamily:"inherit",outline:"none"},
+  lbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#777",display:"block",marginBottom:".5rem"},
+  field:{width:"100%",background:"#1e1e1e",border:"1px solid #333",borderRadius:".875rem",padding:".875rem 1rem",color:"#fff",fontSize:".9rem",fontFamily:"inherit",outline:"none"},
   fieldSm:{background:"#141414",border:"1px solid #222",borderRadius:".75rem",padding:".5rem .75rem",color:"#fff",fontSize:".8rem",fontFamily:"inherit",outline:"none",flex:"1"},
   grid2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".5rem"},
-  pillBase:{width:"100%",padding:".875rem .75rem",borderRadius:".875rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #222",background:"#141414",color:"#666",cursor:"pointer",textAlign:"center"},
+  pillBase:{width:"100%",padding:".875rem .75rem",borderRadius:".875rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #333",background:"#1e1e1e",color:"#999",cursor:"pointer",textAlign:"center"},
   pillOn:{background:"#fff",color:"#000",borderColor:"#fff"},
   btnP:{width:"100%",padding:"1rem",borderRadius:".875rem",background:"#fff",color:"#000",fontSize:".875rem",fontWeight:"600",border:"none",cursor:"pointer"},
   btnG:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #222",background:"transparent",color:"#555",fontSize:".8rem",cursor:"pointer"},
@@ -388,7 +388,7 @@ function App(){
   if(view==="home") return (
     <div style={Object.assign({},st.page,st.center)}>
       <div style={st.card}>
-        <p style={st.eyebrow}>1 Hotel Melbourne</p>
+        <p style={st.eyebrow}>Mise</p>
         <h1 style={st.heading}>Section Checklists</h1>
         <div style={st.stack}>
           <div><label style={st.lbl}>Your Name</label><input style={st.field} placeholder="Enter your name" value={name} onChange={function(e){setName(e.target.value);}}/></div>
