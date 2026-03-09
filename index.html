@@ -37,7 +37,8 @@ const STRUCTURE = {
   "In Room Dining":["IRD Runner","Amenities"]
 };
 const LOCS = ["Kitchen","FOH","Bar","In Room Dining"];
-const SHIFTS = ["Opening","Closing"];
+const SHIFTS = ["Opening","Closing","Weekly","Bi-Weekly","Monthly"];
+const DEFAULT_ENABLED = {Opening:true,Closing:true,Weekly:false,"Bi-Weekly":false,Monthly:false};
 const ADMIN_PW = "1hotel";
 
 const DT = {
@@ -66,7 +67,20 @@ const DT = {
 function deepClone(o){return JSON.parse(JSON.stringify(o));}
 function migrate(cl){
   const u=deepClone(cl);
-  LOCS.forEach(function(l){Object.keys(u[l]||{}).forEach(function(sc){SHIFTS.forEach(function(sh){if(u[l][sc]&&u[l][sc][sh]){u[l][sc][sh]=u[l][sc][sh].map(function(t){return typeof t==="string"?{text:t,requiresPhoto:false}:t;});}});});});
+  LOCS.forEach(function(l){
+    Object.keys(u[l]||{}).forEach(function(sc){
+      // Ensure _enabled exists
+      if(!u[l][sc]._enabled) u[l][sc]._enabled=deepClone(DEFAULT_ENABLED);
+      SHIFTS.forEach(function(sh){
+        // Ensure each shift array exists
+        if(!u[l][sc][sh]) u[l][sc][sh]=[];
+        // Migrate string tasks to objects
+        u[l][sc][sh]=u[l][sc][sh].map(function(t){return typeof t==="string"?{text:t,requiresPhoto:false}:t;});
+        // Ensure _enabled has entry for this shift
+        if(u[l][sc]._enabled[sh]===undefined) u[l][sc]._enabled[sh]=DEFAULT_ENABLED[sh]||false;
+      });
+    });
+  });
   return u;
 }
 
@@ -380,8 +394,20 @@ function App(){
   const toggleTaskPhoto=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh][i]=Object.assign({},u[l][sc][sh][i],{requiresPhoto:!u[l][sc][sh][i].requiresPhoto});saveCls(u);};
   const removeTask=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh].splice(i,1);saveCls(u);};
   const addTask=function(l,sc,sh){const u=deepClone(cls);u[l][sc][sh].push({text:"New task",requiresPhoto:false});saveCls(u);};
+  const toggleShiftEnabled=function(l,sc,sh){
+    const u=deepClone(cls);
+    if(!u[l][sc]._enabled) u[l][sc]._enabled=deepClone(DEFAULT_ENABLED);
+    u[l][sc]._enabled[sh]=!u[l][sc]._enabled[sh];
+    saveCls(u);
+  };
+  const getEnabledShifts=function(l,sc){
+    if(!cls||!cls[l]||!cls[l][sc]) return [];
+    const en=cls[l][sc]._enabled||DEFAULT_ENABLED;
+    return SHIFTS.filter(function(sh){return en[sh]!==false;});
+  };
   const eSections=cls?(STRUCTURE[eLoc]||[]):[];
   const eTasks=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
+  const eEnabled=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec]._enabled?cls[eLoc][eSec]._enabled:deepClone(DEFAULT_ENABLED);
 
   if(view==="loading") return React.createElement("div",{style:Object.assign({},st.page,st.center)},React.createElement("p",{style:{fontSize:".75rem",color:"#444",letterSpacing:".1em",textTransform:"uppercase"}},"Loading…"));
 
@@ -393,8 +419,8 @@ function App(){
         <div style={st.stack}>
           <div><label style={st.lbl}>Your Name</label><input style={st.field} placeholder="Enter your name" value={name} onChange={function(e){setName(e.target.value);}}/></div>
           <div><label style={st.lbl}>Location</label><div style={st.grid2}>{LOCS.map(function(l){return <Pill key={l} label={l} active={loc===l} onClick={function(){setLoc(l);setSec("");}}/>; })}</div></div>
-          {loc?<div><label style={st.lbl}>Section</label><div style={st.grid2}>{STRUCTURE[loc].map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);}}/>; })}</div></div>:null}
-          {sec?<div><label style={st.lbl}>Shift</label><div style={st.grid2}>{SHIFTS.map(function(sh){return <Pill key={sh} label={sh} active={shift===sh} onClick={function(){setShift(sh);}}/>; })}</div></div>:null}
+          {loc?<div><label style={st.lbl}>Section</label><div style={st.grid2}>{STRUCTURE[loc].map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);setShift("");}}/>; })}</div></div>:null}
+          {sec?<div><label style={st.lbl}>Shift</label><div style={st.grid2}>{getEnabledShifts(loc,sec).map(function(sh){return <Pill key={sh} label={sh} active={shift===sh} onClick={function(){setShift(sh);}}/>; })}</div></div>:null}
           <button style={Object.assign({},st.btnP,{opacity:(!name.trim()||!loc||!sec||!shift)?0.25:1})} disabled={!name.trim()||!loc||!sec||!shift} onClick={startChecklist}>Start Checklist →</button>
         </div>
         <button style={st.adminLink} onClick={function(){setView("adminLogin");}}>Admin</button>
@@ -524,6 +550,18 @@ function App(){
             <p style={{fontSize:".7rem",color:"#555",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Changes save instantly to all devices.{configSaving?" Saving…":""}</p>
             <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);setESec(STRUCTURE[l][0]);}}/>; })}</div>
             <div style={st.chipRow}>{eSections.map(function(sc){return <Chip key={sc} label={sc} active={eSec===sc} onClick={function(){setESec(sc);}}/>; })}</div>
+
+            {/* Shift enable/disable toggles */}
+            <div style={{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:"1rem"}}>
+              <p style={{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".75rem"}}>Active Shifts for {eSec}</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:".5rem"}}>
+                {SHIFTS.map(function(sh){
+                  const on=eEnabled[sh]!==false;
+                  return React.createElement("button",{key:sh,style:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".8rem",fontWeight:"500",border:"1px solid "+(on?"#fff":"#333"),background:on?"#fff":"transparent",color:on?"#000":"#555",cursor:"pointer"},onClick:function(){toggleShiftEnabled(eLoc,eSec,sh);}},sh);
+                })}
+              </div>
+            </div>
+
             <div style={Object.assign({},st.chipRow,{marginBottom:"1rem"})}>{SHIFTS.map(function(sh){return <Chip key={sh} label={sh} active={eShift===sh} onClick={function(){setEShift(sh);}}/>; })}</div>
             <div style={{marginBottom:".75rem"}}>
               {eTasks.map(function(task,i){return <EditTaskRow key={i} task={task} idx={i}
