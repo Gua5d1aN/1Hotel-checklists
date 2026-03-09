@@ -310,7 +310,7 @@ function App(){
   const [expanded,setExpanded]=useState(null);
 
   useEffect(function(){
-    sbFetchConfig().then(function(config){setCls(config||deepClone(DT));setView("home");}).catch(function(){setCls(deepClone(DT));setView("home");});
+    sbFetchConfig().then(function(config){setCls(config||deepClone(DT));setView("welcome");}).catch(function(){setCls(deepClone(DT));setView("welcome");});
   },[]);
 
   const saveCls=function(u){setCls(u);setConfigSaving(true);sbSaveConfig(u).finally(function(){setConfigSaving(false);});};
@@ -360,7 +360,7 @@ function App(){
   const photoNeeded=tasks.filter(function(t,i){return t.requiresPhoto&&checked[i]&&!photos[i];}).length;
   const btnLabel=allDone?"Submit Checklist ✓":unticked>0?unticked+" task"+(unticked!==1?"s":"")+" remaining":photoNeeded+" photo"+(photoNeeded!==1?"s":"")+" required";
 
-  const resetHome=function(){setLoc("");setSec("");setShift("");setName("");setSubmitErr(false);setPhotoErr(false);setView("home");};
+  const resetHome=function(){setLoc("");setSec("");setShift("");setName("");setSubmitErr(false);setPhotoErr(false);setView("welcome");};
   const startChecklist=function(){
     const t=cls[loc]&&cls[loc][sec]&&cls[loc][sec][shift]?cls[loc][sec][shift]:[];
     setTasks(t);setChecked(new Array(t.length).fill(false));setPhotos(new Array(t.length).fill(null));
@@ -437,9 +437,56 @@ function App(){
 
   if(view==="loading") return React.createElement("div",{style:Object.assign({},st.page,st.center)},React.createElement("p",{style:{fontSize:".75rem",color:"#444",letterSpacing:".1em",textTransform:"uppercase"}},"Loading…"));
 
+  if(view==="welcome") return (
+    <div style={{minHeight:"100vh",background:"#0a0a0a",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem",position:"relative",overflow:"hidden"}}>
+      {/* Subtle radial accent */}
+      <div style={{position:"absolute",top:"-10%",left:"50%",transform:"translateX(-50%)",width:"600px",height:"600px",background:"radial-gradient(ellipse at center, rgba(255,255,255,0.04) 0%, transparent 70%)",pointerEvents:"none"}}/>
+      {/* Subtle dot grid */}
+      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, #1e1e1e 1px, transparent 1px)",backgroundSize:"28px 28px",opacity:"0.5",pointerEvents:"none"}}/>
+
+      <div style={{position:"relative",width:"100%",maxWidth:"360px",textAlign:"center"}}>
+        <p style={{fontSize:"1.1rem",letterSpacing:".25em",textTransform:"uppercase",color:"#ffffff",fontWeight:"700",marginBottom:"1rem"}}>Mise</p>
+        <h1 style={{fontSize:"2rem",fontWeight:"700",lineHeight:"1.2",marginBottom:".5rem"}}>Welcome to Mise</h1>
+        <p style={{fontSize:".95rem",color:"#555",marginBottom:"3rem",fontStyle:"italic"}}>your hospo friend</p>
+
+        <p style={{fontSize:".65rem",letterSpacing:".15em",textTransform:"uppercase",color:"#444",marginBottom:"1rem"}}>Please select your task</p>
+
+        <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
+          {/* Daily Checklists — active */}
+          <button onClick={function(){setView("home");}} style={{width:"100%",background:"#141414",border:"1px solid #333",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"border-color .2s"}}
+            onMouseEnter={function(e){e.currentTarget.style.borderColor="#666";}}
+            onMouseLeave={function(e){e.currentTarget.style.borderColor="#333";}}>
+            <div>
+              <p style={{fontSize:".95rem",fontWeight:"600",color:"#fff",marginBottom:".2rem"}}>Daily Checklists</p>
+              <p style={{fontSize:".75rem",color:"#555"}}>Opening, closing & shift tasks</p>
+            </div>
+            <span style={{fontSize:"1.2rem",color:"#444"}}>→</span>
+          </button>
+
+          {/* Coming Soon cards */}
+          {[
+            {title:"Staff Equipment Training",desc:"Track equipment sign-offs & competencies"},
+            {title:"Maintenance & Equipment Logs",desc:"Log equipment issues & repairs"}
+          ].map(function(item){
+            return React.createElement("div",{key:item.title,style:{width:"100%",background:"#0d0d0d",border:"1px solid #1a1a1a",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",opacity:"0.5"}},
+              React.createElement("div",null,
+                React.createElement("p",{style:{fontSize:".95rem",fontWeight:"600",color:"#666",marginBottom:".2rem"}},item.title),
+                React.createElement("p",{style:{fontSize:".75rem",color:"#333"}},item.desc)
+              ),
+              React.createElement("span",{style:{fontSize:".65rem",letterSpacing:".1em",textTransform:"uppercase",color:"#333",border:"1px solid #222",borderRadius:".375rem",padding:".25rem .5rem"}},"Soon")
+            );
+          })}
+        </div>
+
+        <button style={{marginTop:"2.5rem",fontSize:".7rem",color:"#1e1e1e",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"}} onClick={function(){setView("adminLogin");}}>Admin</button>
+      </div>
+    </div>
+  );
+
   if(view==="home") return (
     <div style={Object.assign({},st.page,st.center)}>
       <div style={st.card}>
+        <button style={st.backBtn} onClick={function(){setView("welcome");}}>← Back</button>
         <p style={st.eyebrow}>Mise</p>
         <h1 style={st.heading}>Section Checklists</h1>
         <div style={st.stack}>
@@ -502,7 +549,7 @@ function App(){
     <div style={Object.assign({},st.page,st.col)}>
       <div style={st.adminWrap}>
         <div style={st.rowSB}>
-          <button style={Object.assign({},st.backBtn,{marginBottom:"0"})} onClick={function(){setView("home");exitSelectMode();}}>← Exit</button>
+          <button style={Object.assign({},st.backBtn,{marginBottom:"0"})} onClick={function(){setView("welcome");exitSelectMode();}}>← Exit</button>
           <span style={{fontSize:".9rem",fontWeight:"600"}}>Admin</span>
           <div style={{width:"3rem"}}/>
         </div>
