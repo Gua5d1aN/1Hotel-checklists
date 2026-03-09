@@ -34,9 +34,9 @@ const STRUCTURE = {
   Kitchen:["Grill","Larder","Pans","Fryer"],
   FOH:["Floor","Host / Reception","Terrace"],
   Bar:["Crane Bar","Back Bar","LVL1 Bar"],
-  "In Room Dining":["IRD Runner","Amenities"]
+  IRD:["IRD"]
 };
-const LOCS = ["Kitchen","FOH","Bar","In Room Dining"];
+const LOCS = ["Kitchen","FOH","Bar","IRD"];
 const SHIFTS = ["Opening","Closing","Weekly","Bi-Weekly","Monthly"];
 const DEFAULT_ENABLED = {Opening:true,Closing:true,Weekly:false,"Bi-Weekly":false,Monthly:false};
 const ADMIN_PW = "1hotel";
@@ -58,9 +58,8 @@ const DT = {
     "Back Bar":{Opening:[{text:"Check back bar stock levels and restock",requiresPhoto:false},{text:"Confirm all spirits and liqueurs are labelled",requiresPhoto:false},{text:"Ensure back bar fridge is at correct temp",requiresPhoto:false},{text:"Restock bar consumables including straws, napkins and picks",requiresPhoto:false},{text:"Clean and organise back bar storage",requiresPhoto:false}],Closing:[{text:"Lock spirits fridge and back bar storage",requiresPhoto:false},{text:"Restock for next shift where possible",requiresPhoto:false},{text:"Wipe down all back bar surfaces",requiresPhoto:false},{text:"Reconcile any stock variances",requiresPhoto:false},{text:"Secure and lock back bar area",requiresPhoto:false}]},
     "LVL1 Bar":{Opening:[{text:"Restock LVL1 bar fridge to par",requiresPhoto:false},{text:"Check spirit and mixer levels",requiresPhoto:false},{text:"Set up bar snacks and garnish station",requiresPhoto:false},{text:"Polish glassware and set bar to standard",requiresPhoto:false},{text:"Test POS and confirm menu is current",requiresPhoto:false}],Closing:[{text:"Clear and clean full bar top",requiresPhoto:false},{text:"Wrap and store all perishables",requiresPhoto:false},{text:"Cash up LVL1 POS",requiresPhoto:false},{text:"Lock bar fridges and spirit storage",requiresPhoto:false},{text:"Complete end-of-shift handover note",requiresPhoto:false}]}
   },
-  "In Room Dining":{
-    "IRD Runner":{Opening:[{text:"Check tray setup and linen stock",requiresPhoto:false},{text:"Confirm delivery equipment is clean and ready",requiresPhoto:false},{text:"Review incoming orders for the shift",requiresPhoto:false},{text:"Confirm lift access and floor coverage plan",requiresPhoto:false},{text:"Brief team on menu updates or item availability",requiresPhoto:false}],Closing:[{text:"Collect all outstanding trays from guest floors",requiresPhoto:false},{text:"Log any unreturned items or breakages",requiresPhoto:false},{text:"Store trays and equipment correctly",requiresPhoto:false},{text:"Complete shift order log",requiresPhoto:false},{text:"Leave handover notes for overnight team",requiresPhoto:false}]},
-    Amenities:{Opening:[{text:"Check amenity and condiment stock levels",requiresPhoto:false},{text:"Restock trays and replenish supplies",requiresPhoto:false},{text:"Confirm presentation standards are met",requiresPhoto:false},{text:"Check expiry dates on all packaged items",requiresPhoto:false},{text:"Review any special amenity requests for today",requiresPhoto:false}],Closing:[{text:"Restock amenity storage for next shift",requiresPhoto:false},{text:"Dispose of any expired items",requiresPhoto:false},{text:"Clean and organise amenity storage area",requiresPhoto:false},{text:"Log any low-stock items for ordering",requiresPhoto:false},{text:"Secure amenity storage",requiresPhoto:false}]}
+  IRD:{
+    IRD:{Opening:[{text:"Check tray setup and linen stock",requiresPhoto:false},{text:"Confirm delivery equipment is clean and ready",requiresPhoto:false},{text:"Review incoming orders for the shift",requiresPhoto:false},{text:"Confirm lift access and floor coverage plan",requiresPhoto:false},{text:"Brief team on menu updates or item availability",requiresPhoto:false}],Closing:[{text:"Collect all outstanding trays from guest floors",requiresPhoto:false},{text:"Log any unreturned items or breakages",requiresPhoto:false},{text:"Store trays and equipment correctly",requiresPhoto:false},{text:"Complete shift order log",requiresPhoto:false},{text:"Leave handover notes for overnight team",requiresPhoto:false}]}
   }
 };
 
@@ -68,15 +67,16 @@ function deepClone(o){return JSON.parse(JSON.stringify(o));}
 function migrate(cl){
   const u=deepClone(cl);
   LOCS.forEach(function(l){
-    Object.keys(u[l]||{}).forEach(function(sc){
+    // Seed _sections if missing
+    if(!u[l]) u[l]={};
+    if(!u[l]._sections) u[l]._sections=deepClone(STRUCTURE[l]);
+    u[l]._sections.forEach(function(sc){
+      if(!u[l][sc]) u[l][sc]={};
       // Ensure _enabled exists
       if(!u[l][sc]._enabled) u[l][sc]._enabled=deepClone(DEFAULT_ENABLED);
       SHIFTS.forEach(function(sh){
-        // Ensure each shift array exists
         if(!u[l][sc][sh]) u[l][sc][sh]=[];
-        // Migrate string tasks to objects
         u[l][sc][sh]=u[l][sc][sh].map(function(t){return typeof t==="string"?{text:t,requiresPhoto:false}:t;});
-        // Ensure _enabled has entry for this shift
         if(u[l][sc]._enabled[sh]===undefined) u[l][sc]._enabled[sh]=DEFAULT_ENABLED[sh]||false;
       });
     });
@@ -405,7 +405,33 @@ function App(){
     const en=cls[l][sc]._enabled||DEFAULT_ENABLED;
     return SHIFTS.filter(function(sh){return en[sh]!==false;});
   };
-  const eSections=cls?(STRUCTURE[eLoc]||[]):[];
+  const getSections=function(l){
+    if(!cls||!cls[l]) return STRUCTURE[l]||[];
+    return cls[l]._sections||STRUCTURE[l]||[];
+  };
+  const addSection=function(l,name){
+    const trimmed=name.trim();
+    if(!trimmed) return;
+    const u=deepClone(cls);
+    if(!u[l]._sections) u[l]._sections=deepClone(STRUCTURE[l]);
+    if(u[l]._sections.indexOf(trimmed)>=0) return;
+    u[l]._sections.push(trimmed);
+    u[l][trimmed]={_enabled:deepClone(DEFAULT_ENABLED)};
+    SHIFTS.forEach(function(sh){u[l][trimmed][sh]=[];});
+    saveCls(u);
+    setESec(trimmed);
+  };
+  const removeSection=function(l,sc){
+    if(!window.confirm("Remove section '"+sc+"' and all its tasks? This cannot be undone.")) return;
+    const u=deepClone(cls);
+    u[l]._sections=(u[l]._sections||[]).filter(function(s){return s!==sc;});
+    delete u[l][sc];
+    saveCls(u);
+    const remaining=u[l]._sections;
+    setESec(remaining.length>0?remaining[0]:"");
+  };
+  const [newSecName,setNewSecName]=useState("");
+  const eSections=getSections(eLoc);
   const eTasks=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
   const eEnabled=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec]._enabled?cls[eLoc][eSec]._enabled:deepClone(DEFAULT_ENABLED);
 
@@ -419,7 +445,7 @@ function App(){
         <div style={st.stack}>
           <div><label style={st.lbl}>Your Name</label><input style={st.field} placeholder="Enter your name" value={name} onChange={function(e){setName(e.target.value);}}/></div>
           <div><label style={st.lbl}>Location</label><div style={st.grid2}>{LOCS.map(function(l){return <Pill key={l} label={l} active={loc===l} onClick={function(){setLoc(l);setSec("");}}/>; })}</div></div>
-          {loc?<div><label style={st.lbl}>Section</label><div style={st.grid2}>{STRUCTURE[loc].map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);setShift("");}}/>; })}</div></div>:null}
+          {loc?<div><label style={st.lbl}>Section</label><div style={st.grid2}>{getSections(loc).map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);setShift("");}}/>; })}</div></div>:null}
           {sec?<div><label style={st.lbl}>Shift</label><div style={st.grid2}>{getEnabledShifts(loc,sec).map(function(sh){return <Pill key={sh} label={sh} active={shift===sh} onClick={function(){setShift(sh);}}/>; })}</div></div>:null}
           <button style={Object.assign({},st.btnP,{opacity:(!name.trim()||!loc||!sec||!shift)?0.25:1})} disabled={!name.trim()||!loc||!sec||!shift} onClick={startChecklist}>Start Checklist →</button>
         </div>
@@ -548,29 +574,48 @@ function App(){
         {adminTab==="edit"?(
           <div>
             <p style={{fontSize:".7rem",color:"#555",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Changes save instantly to all devices.{configSaving?" Saving…":""}</p>
-            <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);setESec(STRUCTURE[l][0]);}}/>; })}</div>
-            <div style={st.chipRow}>{eSections.map(function(sc){return <Chip key={sc} label={sc} active={eSec===sc} onClick={function(){setESec(sc);}}/>; })}</div>
+            <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);const secs=getSections(l);setESec(secs.length>0?secs[0]:"");setNewSecName("");}}/>; })}</div>
 
-            {/* Shift enable/disable toggles */}
-            <div style={{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:"1rem"}}>
-              <p style={{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".75rem"}}>Active Shifts for {eSec}</p>
-              <div style={{display:"flex",flexWrap:"wrap",gap:".5rem"}}>
-                {SHIFTS.map(function(sh){
-                  const on=eEnabled[sh]!==false;
-                  return React.createElement("button",{key:sh,style:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".8rem",fontWeight:"500",border:"1px solid "+(on?"#fff":"#333"),background:on?"#fff":"transparent",color:on?"#000":"#555",cursor:"pointer"},onClick:function(){toggleShiftEnabled(eLoc,eSec,sh);}},sh);
+            {/* Sections with remove buttons */}
+            <div style={{marginBottom:".75rem"}}>
+              <p style={{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".5rem"}}>Sections</p>
+              <div style={{display:"flex",flexWrap:"wrap",gap:".375rem",marginBottom:".5rem"}}>
+                {eSections.map(function(sc){
+                  return React.createElement("div",{key:sc,style:{display:"flex",alignItems:"center",gap:"0",border:"1px solid "+(eSec===sc?"#fff":"#222"),borderRadius:".5rem",overflow:"hidden"}},
+                    React.createElement("button",{style:{padding:".375rem .625rem",fontSize:".75rem",fontWeight:"500",background:eSec===sc?"#fff":"#141414",color:eSec===sc?"#000":"#555",cursor:"pointer",border:"none"},onClick:function(){setESec(sc);}},sc),
+                    eSections.length>1?React.createElement("button",{style:{padding:".375rem .375rem",fontSize:".7rem",background:eSec===sc?"#fff":"#141414",color:eSec===sc?"#999":"#333",cursor:"pointer",border:"none",borderLeft:"1px solid "+(eSec===sc?"#ddd":"#222")},onClick:function(e){e.stopPropagation();removeSection(eLoc,sc);}},"×"):null
+                  );
                 })}
+              </div>
+              {/* Add section */}
+              <div style={{display:"flex",gap:".5rem",alignItems:"center"}}>
+                <input style={Object.assign({},st.editInput,{flex:"1",padding:".5rem .75rem",fontSize:".8rem"})} placeholder="New section name…" value={newSecName} onChange={function(e){setNewSecName(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}}/>
+                <button style={Object.assign({},st.btnG,{flexShrink:"0"})} onClick={function(){if(newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}}>+ Add</button>
               </div>
             </div>
 
-            <div style={Object.assign({},st.chipRow,{marginBottom:"1rem"})}>{SHIFTS.map(function(sh){return <Chip key={sh} label={sh} active={eShift===sh} onClick={function(){setEShift(sh);}}/>; })}</div>
-            <div style={{marginBottom:".75rem"}}>
-              {eTasks.map(function(task,i){return <EditTaskRow key={i} task={task} idx={i}
-                onUpdateText={function(idx,text){updateTaskText(eLoc,eSec,eShift,idx,text);}}
-                onTogglePhoto={function(idx){toggleTaskPhoto(eLoc,eSec,eShift,idx);}}
-                onRemove={function(idx){removeTask(eLoc,eSec,eShift,idx);}}
-              />; })}
-            </div>
-            <button style={st.addBtn} onClick={function(){addTask(eLoc,eSec,eShift);}}>+ Add task</button>
+            {/* Shift enable/disable toggles */}
+            {eSec?React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:"1rem"}},
+              React.createElement("p",{style:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".75rem"}},"Active Shifts for "+eSec),
+              React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:".5rem"}},
+                SHIFTS.map(function(sh){
+                  const on=eEnabled[sh]!==false;
+                  return React.createElement("button",{key:sh,style:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".8rem",fontWeight:"500",border:"1px solid "+(on?"#fff":"#333"),background:on?"#fff":"transparent",color:on?"#000":"#555",cursor:"pointer"},onClick:function(){toggleShiftEnabled(eLoc,eSec,sh);}},sh);
+                })
+              )
+            ):null}
+
+            {eSec?React.createElement("div",null,
+              React.createElement("div",{style:Object.assign({},st.chipRow,{marginBottom:"1rem"})},SHIFTS.map(function(sh){return React.createElement(Chip,{key:sh,label:sh,active:eShift===sh,onClick:function(){setEShift(sh);}});})),
+              React.createElement("div",{style:{marginBottom:".75rem"}},
+                eTasks.map(function(task,i){return React.createElement(EditTaskRow,{key:i,task:task,idx:i,
+                  onUpdateText:function(idx,text){updateTaskText(eLoc,eSec,eShift,idx,text);},
+                  onTogglePhoto:function(idx){toggleTaskPhoto(eLoc,eSec,eShift,idx);},
+                  onRemove:function(idx){removeTask(eLoc,eSec,eShift,idx);}
+                });})
+              ),
+              React.createElement("button",{style:st.addBtn,onClick:function(){addTask(eLoc,eSec,eShift);}}, "+ Add task")
+            ):React.createElement("p",{style:{fontSize:".8rem",color:"#444",textAlign:"center",padding:"1rem 0"}},"No sections yet — add one above.")}
           </div>
         ):null}
       </div>
