@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="theme-color" content="#0a0a0a"/>
+<meta name="theme-color" content="#0e1f0e"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Mise"/>
 <link rel="manifest" href="manifest.json"/>
@@ -15,21 +15,28 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:#0a0a0a;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+body{background:linear-gradient(160deg,#0e1f0e 0%,#111a0f 30%,#16180e 60%,#1a1208 100%);background-attachment:fixed;color:#dce8d4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
 button,input,select{font-family:inherit}
-::placeholder{color:#404040}
-select option{background:#1a1a1a;color:#fff}
+::placeholder{color:#2d3e28}
+select option{background:#162016;color:#dce8d4}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
+/*
+  Mise — Hospitality Shift Checklists
+  Created by Josh
+  All rights reserved.
+*/
 const { useState, useEffect, useCallback, useRef } = React;
 
+// Supabase connection
 const SB_URL = "https://xfrspqumcsxwxmjqsalg.supabase.co";
 const SB_KEY = "sb_publishable_3G8P3sjDyfR_7I-ISUiBbA_ahoLxRSq";
 const HDRS = {"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY};
 
+// App structure — locations are fixed, sections are dynamic via admin
 const STRUCTURE = {
   Kitchen:["Grill","Larder","Pans","Fryer"],
   FOH:["Floor","Host / Reception","Terrace"],
@@ -38,9 +45,10 @@ const STRUCTURE = {
 };
 const LOCS = ["Kitchen","FOH","Bar","IRD"];
 const SHIFTS = ["Opening","Closing","Weekly","Bi-Weekly","Monthly"];
-const DEFAULT_ENABLED = {Opening:true,Closing:true,Weekly:false,"Bi-Weekly":false,Monthly:false};
-const ADMIN_PW = "1hotel";
+const DEFAULT_ENABLED = {Opening:true,Closing:true,Weekly:false,"Bi-Weekly":false,Monthly:false}; // Weekly+ off by default
+const ADMIN_PW = "1hotel"; // client-side only — replace with Supabase auth (roadmap)
 
+// Default tasks — fallback only if Supabase config is empty
 const DT = {
   Kitchen:{
     Grill:{Opening:[{text:"Light and calibrate grill to temp",requiresPhoto:false},{text:"Clean grill grates and drip trays",requiresPhoto:false},{text:"Check protein par and pull from cool room",requiresPhoto:false},{text:"Set up sauces and seasoning mise en place",requiresPhoto:false},{text:"Review service notes and specials",requiresPhoto:false}],Closing:[{text:"Cool down and brush grill grates",requiresPhoto:false},{text:"Empty and clean drip trays",requiresPhoto:false},{text:"Wrap and store all proteins correctly",requiresPhoto:false},{text:"Wipe down entire grill station",requiresPhoto:false},{text:"Complete section temp log",requiresPhoto:false}]},
@@ -64,15 +72,14 @@ const DT = {
 };
 
 function deepClone(o){return JSON.parse(JSON.stringify(o));}
+// Ensures saved config is compatible with current app version
 function migrate(cl){
   const u=deepClone(cl);
   LOCS.forEach(function(l){
-    // Seed _sections if missing
     if(!u[l]) u[l]={};
     if(!u[l]._sections) u[l]._sections=deepClone(STRUCTURE[l]);
     u[l]._sections.forEach(function(sc){
       if(!u[l][sc]) u[l][sc]={};
-      // Ensure _enabled exists
       if(!u[l][sc]._enabled) u[l][sc]._enabled=deepClone(DEFAULT_ENABLED);
       SHIFTS.forEach(function(sh){
         if(!u[l][sc][sh]) u[l][sc][sh]=[];
@@ -84,6 +91,7 @@ function migrate(cl){
   return u;
 }
 
+// Supabase helpers
 async function sbFetchConfig(){
   const res=await fetch(SB_URL+"/rest/v1/checklist_config?select=config&id=eq.1",{headers:HDRS});
   if(!res.ok) throw new Error("Config fetch failed");
@@ -116,6 +124,7 @@ async function uploadPhoto(file,path){
   if(!res.ok) throw new Error("Upload failed");
   return SB_URL+"/storage/v1/object/public/checklist-photos/"+path;
 }
+// CSV export
 function toCSV(rows){
   const h=["ID","Submitted At","Name","Location","Section","Shift","Completed","Total","Tasks"];
   const lines=rows.map(function(r){return[r.id,r.created_at,r.name,r.location,r.section,r.shift,r.completed,r.total,JSON.stringify(r.tasks)].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(",");});
@@ -129,63 +138,64 @@ function downloadCSV(rows){
   URL.revokeObjectURL(url);
 }
 
+// Shared styles — palette derived from 1 Hotel leaf photography
 const st={
-  page:{minHeight:"100vh",background:"#0a0a0a",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"},
+  page:{minHeight:"100vh",background:"transparent",color:"#f0ede8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"},
   center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem"},
   col:{display:"flex",flexDirection:"column",padding:"2rem 1.25rem"},
   card:{width:"100%",maxWidth:"360px"},
   inner:{maxWidth:"360px",width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",flex:"1"},
   adminWrap:{maxWidth:"640px",width:"100%",margin:"0 auto"},
-  eyebrow:{fontSize:"1rem",letterSpacing:".2em",textTransform:"uppercase",color:"#ffffff",marginBottom:".4rem",textAlign:"center",fontWeight:"600"},
-  heading:{fontSize:"1.5rem",fontWeight:"600",textAlign:"center",marginBottom:"2rem"},
-  lbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#777",display:"block",marginBottom:".5rem"},
-  field:{width:"100%",background:"#1e1e1e",border:"1px solid #333",borderRadius:".875rem",padding:".875rem 1rem",color:"#fff",fontSize:".9rem",fontFamily:"inherit",outline:"none"},
-  fieldSm:{background:"#141414",border:"1px solid #222",borderRadius:".75rem",padding:".5rem .75rem",color:"#fff",fontSize:".8rem",fontFamily:"inherit",outline:"none",flex:"1"},
+  eyebrow:{fontSize:"1rem",letterSpacing:".2em",textTransform:"uppercase",color:"#f0ede8",marginBottom:".4rem",textAlign:"center",fontWeight:"600"},
+  heading:{fontSize:"1.5rem",fontWeight:"600",textAlign:"center",marginBottom:"2rem",color:"#ffffff"},
+  lbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",display:"block",marginBottom:".5rem"},
+  field:{width:"100%",background:"rgba(10,20,8,0.55)",border:"1px solid #3a5a2a",borderRadius:".875rem",padding:".875rem 1rem",color:"#f0ede8",fontSize:".9rem",fontFamily:"inherit",outline:"none"},
+  fieldSm:{background:"rgba(10,20,8,0.55)",border:"1px solid #3a5a2a",borderRadius:".75rem",padding:".5rem .75rem",color:"#f0ede8",fontSize:".8rem",fontFamily:"inherit",outline:"none",flex:"1"},
   grid2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".5rem"},
-  pillBase:{width:"100%",padding:".875rem .75rem",borderRadius:".875rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #333",background:"#1e1e1e",color:"#999",cursor:"pointer",textAlign:"center"},
-  pillOn:{background:"#fff",color:"#000",borderColor:"#fff"},
-  btnP:{width:"100%",padding:"1rem",borderRadius:".875rem",background:"#fff",color:"#000",fontSize:".875rem",fontWeight:"600",border:"none",cursor:"pointer"},
-  btnG:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #222",background:"transparent",color:"#555",fontSize:".8rem",cursor:"pointer"},
-  btnDl:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #2a5c2a",background:"transparent",color:"#4ade80",fontSize:".8rem",cursor:"pointer"},
-  btnDanger:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #7f1d1d",background:"transparent",color:"#ef4444",fontSize:".8rem",cursor:"pointer"},
-  btnDangerDim:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #333",background:"transparent",color:"#555",fontSize:".8rem",cursor:"not-allowed",opacity:"0.4"},
-  backBtn:{background:"none",border:"none",color:"#444",fontSize:".85rem",cursor:"pointer",padding:".25rem 0",textAlign:"left",display:"block",marginBottom:"1.5rem"},
+  pillBase:{width:"100%",padding:".875rem .75rem",borderRadius:".875rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",color:"#d8e8c8",cursor:"pointer",textAlign:"center"},
+  pillOn:{background:"#d4e8b8",color:"#0a1a08",borderColor:"#d4e8b8"},
+  btnP:{width:"100%",padding:"1rem",borderRadius:".875rem",background:"#d4e8b8",color:"#0a1a08",fontSize:".875rem",fontWeight:"700",border:"none",cursor:"pointer"},
+  btnG:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #3a5a2a",background:"transparent",color:"#b8c8a8",fontSize:".8rem",cursor:"pointer"},
+  btnDl:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #3a7a3a",background:"transparent",color:"#7ad86a",fontSize:".8rem",cursor:"pointer"},
+  btnDanger:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #7a3820",background:"transparent",color:"#e07858",fontSize:".8rem",cursor:"pointer"},
+  btnDangerDim:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #2a3a20",background:"transparent",color:"#6a7858",fontSize:".8rem",cursor:"not-allowed",opacity:"0.4"},
+  backBtn:{background:"none",border:"none",color:"#b8c8a8",fontSize:".85rem",cursor:"pointer",padding:".25rem 0",textAlign:"left",display:"block",marginBottom:"1.5rem"},
   stack:{display:"flex",flexDirection:"column",gap:".75rem"},
-  pbar:{height:"3px",background:"#1e1e1e",borderRadius:"2px",overflow:"hidden",marginBottom:"1.25rem"},
-  taskBtn:{width:"100%",display:"flex",alignItems:"center",gap:"1rem",padding:"1rem",borderRadius:".875rem",border:"1px solid #222",background:"#141414",cursor:"pointer",textAlign:"left"},
-  taskBtnDone:{background:"#0d0d0d",borderColor:"#1a1a1a"},
-  circle:{width:"1.5rem",height:"1.5rem",borderRadius:"50%",border:"2px solid #444",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:"0"},
-  circleOn:{background:"#fff",borderColor:"#fff"},
-  sicon:{width:"4rem",height:"4rem",borderRadius:"50%",background:"#141414",border:"1px solid #222",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",marginBottom:"1.5rem"},
-  adminLink:{marginTop:"2.5rem",fontSize:".7rem",color:"#1e1e1e",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"},
+  pbar:{height:"3px",background:"rgba(10,20,8,0.5)",borderRadius:"2px",overflow:"hidden",marginBottom:"1.25rem"},
+  taskBtn:{width:"100%",display:"flex",alignItems:"center",gap:"1rem",padding:"1rem",borderRadius:".875rem",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",cursor:"pointer",textAlign:"left"},
+  taskBtnDone:{background:"rgba(10,20,8,0.25)",borderColor:"rgba(50,80,40,0.4)"},
+  circle:{width:"1.5rem",height:"1.5rem",borderRadius:"50%",border:"2px solid #5a8050",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:"0"},
+  circleOn:{background:"#d4e8b8",borderColor:"#d4e8b8"},
+  sicon:{width:"4rem",height:"4rem",borderRadius:"50%",background:"rgba(10,20,8,0.5)",border:"1px solid #3a5a2a",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",marginBottom:"1.5rem"},
+  adminLink:{marginTop:"2.5rem",fontSize:".7rem",color:"rgba(180,200,160,0.25)",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"},
   tabRow:{display:"flex",gap:".5rem",marginBottom:"1.5rem",flexWrap:"wrap"},
-  tab:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #222",background:"#141414",color:"#555",cursor:"pointer"},
-  tabOn:{background:"#fff",color:"#000",borderColor:"#fff"},
-  logCard:{width:"100%",background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",textAlign:"left",marginBottom:".5rem",display:"flex",alignItems:"flex-start",gap:".75rem"},
-  logCardSelected:{borderColor:"#ef4444",background:"#1a0a0a"},
-  logExpand:{marginTop:".75rem",paddingTop:".75rem",borderTop:"1px solid #1e1e1e"},
+  tab:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",color:"#b8c8a8",cursor:"pointer"},
+  tabOn:{background:"#d4e8b8",color:"#0a1a08",borderColor:"#d4e8b8"},
+  logCard:{width:"100%",background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".875rem",padding:"1rem",textAlign:"left",marginBottom:".5rem",display:"flex",alignItems:"flex-start",gap:".75rem"},
+  logCardSelected:{borderColor:"#e07858",background:"rgba(60,15,5,0.5)"},
+  logExpand:{marginTop:".75rem",paddingTop:".75rem",borderTop:"1px solid #3a5a2a"},
   chipRow:{display:"flex",flexWrap:"wrap",gap:".375rem",marginBottom:".75rem"},
-  chip:{padding:".375rem .75rem",borderRadius:".5rem",fontSize:".75rem",fontWeight:"500",border:"1px solid #222",background:"#141414",color:"#555",cursor:"pointer"},
-  chipOn:{background:"#fff",color:"#000",borderColor:"#fff"},
+  chip:{padding:".375rem .75rem",borderRadius:".5rem",fontSize:".75rem",fontWeight:"500",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",color:"#b8c8a8",cursor:"pointer"},
+  chipOn:{background:"#d4e8b8",color:"#0a1a08",borderColor:"#d4e8b8"},
   editRow:{display:"flex",gap:".5rem",alignItems:"center",marginBottom:".5rem"},
-  editInput:{flex:"1",background:"#141414",border:"1px solid #222",borderRadius:".625rem",padding:".75rem",fontSize:".875rem",color:"#fff",fontFamily:"inherit",outline:"none"},
-  rmBtn:{background:"none",border:"none",color:"#333",fontSize:"1.5rem",cursor:"pointer",width:"2rem",flexShrink:"0",lineHeight:"1"},
-  addBtn:{width:"100%",padding:".875rem",borderRadius:".875rem",border:"1px dashed #282828",background:"transparent",color:"#444",fontSize:".875rem",cursor:"pointer"},
+  editInput:{flex:"1",background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".625rem",padding:".75rem",fontSize:".875rem",color:"#f0ede8",fontFamily:"inherit",outline:"none"},
+  rmBtn:{background:"none",border:"none",color:"#5a7850",fontSize:"1.5rem",cursor:"pointer",width:"2rem",flexShrink:"0",lineHeight:"1"},
+  addBtn:{width:"100%",padding:".875rem",borderRadius:".875rem",border:"1px dashed #4a6840",background:"transparent",color:"#b8c8a8",fontSize:".875rem",cursor:"pointer"},
   rowSB:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.75rem"},
-  pctRow:{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:"#444",marginBottom:".5rem"},
+  pctRow:{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:"#b8c8a8",marginBottom:".5rem"},
   tasksWrap:{flex:"1",marginBottom:"1.25rem"},
-  uploadBtn:{background:"transparent",border:"1px solid #f59e0b",color:"#f59e0b",borderRadius:".625rem",padding:".375rem .875rem",fontSize:".75rem",cursor:"pointer",fontFamily:"inherit"},
-  photoToggle:{background:"none",border:"1px solid #333",borderRadius:".5rem",padding:".35rem .5rem",fontSize:".85rem",cursor:"pointer",flexShrink:"0"},
-  photoToggleOn:{borderColor:"#f59e0b",background:"rgba(245,158,11,.12)"},
-  statBox:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem 1.25rem",flex:"1",minWidth:"100px"},
-  sectionLbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".75rem",display:"block"},
-  checkbox:{width:"1.1rem",height:"1.1rem",accentColor:"#ef4444",cursor:"pointer",flexShrink:"0",marginTop:".15rem"},
+  uploadBtn:{background:"transparent",border:"1px solid #a07840",color:"#d4a860",borderRadius:".625rem",padding:".375rem .875rem",fontSize:".75rem",cursor:"pointer",fontFamily:"inherit"},
+  photoToggle:{background:"none",border:"1px solid #4a6840",borderRadius:".5rem",padding:".35rem .5rem",fontSize:".85rem",cursor:"pointer",flexShrink:"0"},
+  photoToggleOn:{borderColor:"#a07840",background:"rgba(160,120,64,.2)"},
+  statBox:{background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".875rem",padding:"1rem 1.25rem",flex:"1",minWidth:"100px"},
+  sectionLbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".75rem",display:"block"},
+  checkbox:{width:"1.1rem",height:"1.1rem",accentColor:"#e07858",cursor:"pointer",flexShrink:"0",marginTop:".15rem"},
 };
 
 function Pill(p){return React.createElement("button",{style:Object.assign({},st.pillBase,p.active?st.pillOn:{}),onClick:p.onClick},p.label);}
 function TabBtn(p){return React.createElement("button",{style:Object.assign({},st.tab,p.active?st.tabOn:{}),onClick:p.onClick},p.label);}
 function Chip(p){return React.createElement("button",{style:Object.assign({},st.chip,p.active?st.chipOn:{}),onClick:p.onClick},p.label);}
-function CheckTick(){return React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",stroke:"#000",strokeWidth:"3",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
+function CheckTick(){return React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",stroke:"#0a130a",strokeWidth:"3",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
 function CheckBig(p){return React.createElement("svg",{width:"28",height:"28",viewBox:"0 0 24 24",fill:"none",stroke:p.color,strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
 
 function TaskRow(p){
@@ -198,12 +208,12 @@ function TaskRow(p){
   return React.createElement("div",{style:{marginBottom:".5rem"}},
     React.createElement("button",{style:Object.assign({},st.taskBtn,isFullyDone?st.taskBtnDone:{}),onClick:p.onToggle},
       React.createElement("div",{style:Object.assign({},st.circle,p.isChecked?st.circleOn:{})},p.isChecked?React.createElement(CheckTick,null):null),
-      React.createElement("span",{style:{fontSize:".875rem",lineHeight:"1.45",flex:"1",textAlign:"left",color:isFullyDone?"#404040":"#e0e0e0",textDecoration:isFullyDone?"line-through":"none"}},p.task.text),
-      needsPhoto?React.createElement("span",{style:{fontSize:".7rem",flexShrink:"0",color:hasPhoto?"#4ade80":"#f59e0b"}},"📷"):null
+      React.createElement("span",{style:{fontSize:".875rem",lineHeight:"1.45",flex:"1",textAlign:"left",color:isFullyDone?"#4d6848":"#e8f5e0",textDecoration:isFullyDone?"line-through":"none"}},p.task.text),
+      needsPhoto?React.createElement("span",{style:{fontSize:".7rem",flexShrink:"0",color:hasPhoto?"#6ab84a":"#8b6432"}},"📷"):null
     ),
     p.isChecked&&needsPhoto?React.createElement("div",{style:{paddingLeft:"3.5rem",marginTop:".3rem"}},
       hasPhoto
-        ?React.createElement("span",{style:{fontSize:".75rem",color:"#4ade80"}},"✓ Photo uploaded")
+        ?React.createElement("span",{style:{fontSize:".75rem",color:"#7ad86a"}},"✓ Photo uploaded")
         :React.createElement("div",null,
           React.createElement("button",{style:st.uploadBtn,onClick:function(){if(fileRef.current)fileRef.current.click();},disabled:isUploading},isUploading?"Uploading…":"📷 Add required photo"),
           React.createElement("input",{ref:fileRef,type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:handleChange})
@@ -243,8 +253,8 @@ function ResultsView(p){
   const missedTasks={};
   filtered.forEach(function(l){(l.tasks||[]).forEach(function(t){if(!t.done)missedTasks[t.task]=(missedTasks[t.task]||0)+1;});});
   const topMissed=Object.entries(missedTasks).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
-  if(p.logsLoading) return React.createElement("p",{style:{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}},"Loading…");
-  if(p.logsErr) return React.createElement("p",{style:{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}},"Failed to load.");
+  if(p.logsLoading) return React.createElement("p",{style:{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}},"Loading…");
+  if(p.logsErr) return React.createElement("p",{style:{fontSize:".875rem",color:"#e07858",textAlign:"center",padding:"3rem 0"}},"Failed to load.");
   return React.createElement("div",null,
     React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}},
       React.createElement("button",{style:st.btnG,onClick:p.onRefresh},"↺ Refresh"),
@@ -253,27 +263,27 @@ function ResultsView(p){
       React.createElement("select",{style:st.fieldSm,value:filterDate,onChange:function(e){setFilterDate(e.target.value);}},dateOpts.map(function(d){return React.createElement("option",{key:d},d);}))
     ),
     total===0
-      ?React.createElement("p",{style:{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}},"No submissions match the selected filters.")
+      ?React.createElement("p",{style:{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}},"No submissions match the selected filters.")
       :React.createElement("div",null,
         React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap"}},
-          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#fff"}},total),React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Submissions")),
-          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#4ade80"}},compRate+"%"),React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Completion rate")),
-          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:incomplete>0?"#f59e0b":"#4ade80"}},incomplete),React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Incomplete"))
+          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#ffffff"}},total),React.createElement("p",{style:{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Submissions")),
+          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#7ad86a"}},compRate+"%"),React.createElement("p",{style:{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Completion rate")),
+          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:incomplete>0?"#d4a860":"#7ad86a"}},incomplete),React.createElement("p",{style:{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Incomplete"))
         ),
         React.createElement("span",{style:st.sectionLbl},"Completion by Section"),
         React.createElement("div",{style:{marginBottom:"1.5rem"}},
           Object.entries(bySec).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(entry){
-            const k=entry[0],v=entry[1],pct=Math.round(v.done/v.total*100),bc=pct===100?"#4ade80":pct>=50?"#f59e0b":"#ef4444";
+            const k=entry[0],v=entry[1],pct=Math.round(v.done/v.total*100),bc=pct===100?"#7ad86a":pct>=50?"#d4a860":"#e07858";
             return React.createElement("div",{key:k,style:{marginBottom:".75rem"}},
-              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:".3rem"}},React.createElement("span",{style:{color:"#ccc"}},k),React.createElement("span",{style:{color:bc}},v.done+"/"+v.total+" · "+pct+"%")),
-              React.createElement("div",{style:{height:"4px",background:"#1e1e1e",borderRadius:"2px",overflow:"hidden"}},React.createElement("div",{style:{height:"100%",borderRadius:"2px",width:pct+"%",background:bc,transition:"width .4s"}}))
+              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:".3rem"}},React.createElement("span",{style:{color:"#e0eed0"}},k),React.createElement("span",{style:{color:bc}},v.done+"/"+v.total+" · "+pct+"%")),
+              React.createElement("div",{style:{height:"4px",background:"rgba(10,20,8,0.5)",borderRadius:"2px",overflow:"hidden"}},React.createElement("div",{style:{height:"100%",borderRadius:"2px",width:pct+"%",background:bc,transition:"width .4s"}}))
             );
           })
         ),
         topMissed.length>0?React.createElement("div",null,
           React.createElement("span",{style:st.sectionLbl},"Most Missed Tasks"),
-          React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",overflow:"hidden"}},
-            topMissed.map(function(entry,i){return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:".75rem 1rem",borderBottom:i<topMissed.length-1?"1px solid #1e1e1e":"none"}},React.createElement("span",{style:{fontSize:".8rem",color:"#ccc",flex:"1",marginRight:"1rem"}},entry[0]),React.createElement("span",{style:{fontSize:".75rem",fontWeight:"600",color:"#f59e0b",flexShrink:"0"}},entry[1]+"x missed"));})
+          React.createElement("div",{style:{background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".875rem",overflow:"hidden"}},
+            topMissed.map(function(entry,i){return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:".75rem 1rem",borderBottom:i<topMissed.length-1?"1px solid rgba(58,90,42,0.4)":"none"}},React.createElement("span",{style:{fontSize:".8rem",color:"#e0eed0",flex:"1",marginRight:"1rem"}},entry[0]),React.createElement("span",{style:{fontSize:".75rem",fontWeight:"600",color:"#d4a860",flexShrink:"0"}},entry[1]+"x missed"));})
           )
         ):null
       )
@@ -313,7 +323,9 @@ function App(){
     sbFetchConfig().then(function(config){setCls(config||deepClone(DT));setView("welcome");}).catch(function(){setCls(deepClone(DT));setView("welcome");});
   },[]);
 
+  // Save config to Supabase and update local state
   const saveCls=function(u){setCls(u);setConfigSaving(true);sbSaveConfig(u).finally(function(){setConfigSaving(false);});};
+  // Fetch logs — called on admin tab load and manual refresh
   const fetchLogs=useCallback(async function(){
     setLogsLoading(true);setLogsErr(false);
     try{setLogs(await sbFetchLogs());}catch(e){setLogsErr(true);}
@@ -321,7 +333,6 @@ function App(){
   },[]);
   useEffect(function(){if(view==="admin"&&(adminTab==="logs"||adminTab==="results"))fetchLogs();},[view,adminTab,fetchLogs]);
 
-  // Delete handlers
   const handleDeleteSelected=async function(){
     if(!selectedIds.length) return;
     if(!window.confirm("Delete "+selectedIds.length+" selected submission"+(selectedIds.length!==1?"s":"")+"? This cannot be undone.")) return;
@@ -435,50 +446,41 @@ function App(){
   const eTasks=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
   const eEnabled=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec]._enabled?cls[eLoc][eSec]._enabled:deepClone(DEFAULT_ENABLED);
 
-  if(view==="loading") return React.createElement("div",{style:Object.assign({},st.page,st.center)},React.createElement("p",{style:{fontSize:".75rem",color:"#444",letterSpacing:".1em",textTransform:"uppercase"}},"Loading…"));
+  if(view==="loading") return React.createElement("div",{style:Object.assign({},st.page,st.center)},React.createElement("p",{style:{fontSize:".75rem",color:"#b8c8a8",letterSpacing:".1em",textTransform:"uppercase"}},"Loading…"));
 
   if(view==="welcome") return (
-    <div style={{minHeight:"100vh",background:"#0a0a0a",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem",position:"relative",overflow:"hidden"}}>
-      {/* Subtle radial accent */}
-      <div style={{position:"absolute",top:"-10%",left:"50%",transform:"translateX(-50%)",width:"600px",height:"600px",background:"radial-gradient(ellipse at center, rgba(255,255,255,0.04) 0%, transparent 70%)",pointerEvents:"none"}}/>
-      {/* Subtle dot grid */}
-      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, #1e1e1e 1px, transparent 1px)",backgroundSize:"28px 28px",opacity:"0.5",pointerEvents:"none"}}/>
-
+    <div style={{minHeight:"100vh",background:"transparent",color:"#f0ede8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem",position:"relative",overflow:"hidden"}}>
+      <div style={{position:"absolute",top:"-10%",left:"50%",transform:"translateX(-50%)",width:"600px",height:"600px",background:"radial-gradient(ellipse at center, rgba(80,130,60,0.1) 0%, transparent 70%)",pointerEvents:"none"}}/>
+      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, #2a3e20 1px, transparent 1px)",backgroundSize:"28px 28px",opacity:"0.4",pointerEvents:"none"}}/>
       <div style={{position:"relative",width:"100%",maxWidth:"360px",textAlign:"center"}}>
-        <p style={{fontSize:"1.1rem",letterSpacing:".25em",textTransform:"uppercase",color:"#ffffff",fontWeight:"700",marginBottom:"1rem"}}>Mise</p>
-        <h1 style={{fontSize:"2rem",fontWeight:"700",lineHeight:"1.2",marginBottom:".5rem"}}>Welcome to Mise</h1>
-        <p style={{fontSize:".95rem",color:"#555",marginBottom:"3rem",fontStyle:"italic"}}>your hospo friend</p>
-
-        <p style={{fontSize:".65rem",letterSpacing:".15em",textTransform:"uppercase",color:"#444",marginBottom:"1rem"}}>Please select your task</p>
-
+        <p style={{fontSize:"1.1rem",letterSpacing:".25em",textTransform:"uppercase",color:"#f0ede8",fontWeight:"700",marginBottom:"1rem"}}>Mise</p>
+        <h1 style={{fontSize:"2rem",fontWeight:"700",lineHeight:"1.2",marginBottom:".5rem",color:"#ffffff"}}>Welcome to Mise</h1>
+        <p style={{fontSize:".95rem",color:"#c8d8b8",marginBottom:"3rem",fontStyle:"italic"}}>your hospo friend</p>
+        <p style={{fontSize:".65rem",letterSpacing:".15em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:"1rem"}}>Please select your task</p>
         <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
-          {/* Daily Checklists — active */}
-          <button onClick={function(){setView("home");}} style={{width:"100%",background:"#141414",border:"1px solid #333",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"border-color .2s"}}
-            onMouseEnter={function(e){e.currentTarget.style.borderColor="#666";}}
-            onMouseLeave={function(e){e.currentTarget.style.borderColor="#333";}}>
+          <button onClick={function(){setView("home");}} style={{width:"100%",background:"rgba(10,20,8,0.5)",border:"1px solid #5a8050",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}
+            onMouseEnter={function(e){e.currentTarget.style.borderColor="#9ac880";}}
+            onMouseLeave={function(e){e.currentTarget.style.borderColor="#5a8050";}}>
             <div>
-              <p style={{fontSize:".95rem",fontWeight:"600",color:"#fff",marginBottom:".2rem"}}>Daily Checklists</p>
-              <p style={{fontSize:".75rem",color:"#555"}}>Opening, closing & shift tasks</p>
+              <p style={{fontSize:".95rem",fontWeight:"600",color:"#ffffff",marginBottom:".2rem"}}>Daily Checklists</p>
+              <p style={{fontSize:".75rem",color:"#c8d8b8"}}>Opening, closing & shift tasks</p>
             </div>
-            <span style={{fontSize:"1.2rem",color:"#444"}}>→</span>
+            <span style={{fontSize:"1.2rem",color:"#c8d8b8"}}>→</span>
           </button>
-
-          {/* Coming Soon cards */}
           {[
             {title:"Staff Equipment Training",desc:"Track equipment sign-offs & competencies"},
             {title:"Maintenance & Equipment Logs",desc:"Log equipment issues & repairs"}
           ].map(function(item){
-            return React.createElement("div",{key:item.title,style:{width:"100%",background:"#0d0d0d",border:"1px solid #1a1a1a",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",opacity:"0.5"}},
+            return React.createElement("div",{key:item.title,style:{width:"100%",background:"rgba(10,20,8,0.3)",border:"1px solid rgba(90,128,80,0.35)",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",opacity:"0.65"}},
               React.createElement("div",null,
-                React.createElement("p",{style:{fontSize:".95rem",fontWeight:"600",color:"#666",marginBottom:".2rem"}},item.title),
-                React.createElement("p",{style:{fontSize:".75rem",color:"#333"}},item.desc)
+                React.createElement("p",{style:{fontSize:".95rem",fontWeight:"600",color:"#d8e8c8",marginBottom:".2rem"}},item.title),
+                React.createElement("p",{style:{fontSize:".75rem",color:"#b8c8a8"}},item.desc)
               ),
-              React.createElement("span",{style:{fontSize:".65rem",letterSpacing:".1em",textTransform:"uppercase",color:"#333",border:"1px solid #222",borderRadius:".375rem",padding:".25rem .5rem"}},"Soon")
+              React.createElement("span",{style:{fontSize:".65rem",letterSpacing:".1em",textTransform:"uppercase",color:"#b8c8a8",border:"1px solid rgba(90,128,80,0.5)",borderRadius:".375rem",padding:".25rem .5rem"}},"Soon")
             );
           })}
         </div>
-
-        <button style={{marginTop:"2.5rem",fontSize:".7rem",color:"#1e1e1e",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"}} onClick={function(){setView("adminLogin");}}>Admin</button>
+        <button style={{marginTop:"2.5rem",fontSize:".7rem",color:"rgba(200,220,180,0.2)",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"}} onClick={function(){setView("adminLogin");}}>Admin</button>
       </div>
     </div>
   );
@@ -505,15 +507,15 @@ function App(){
     <div style={Object.assign({},st.page,st.col)}>
       <div style={st.inner}>
         <button style={st.backBtn} onClick={resetHome}>← Back</button>
-        <p style={{fontSize:".7rem",letterSpacing:".1em",textTransform:"uppercase",color:"#555",marginBottom:".3rem"}}>{name} · {loc} · {sec}</p>
-        <h2 style={{fontSize:"1.3rem",fontWeight:"600",marginBottom:"1.25rem"}}>{shift} Checklist</h2>
+        <p style={{fontSize:".7rem",letterSpacing:".1em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".3rem"}}>{name} · {loc} · {sec}</p>
+        <h2 style={{fontSize:"1.3rem",fontWeight:"600",marginBottom:"1.25rem",color:"#f0f8e8"}}>{shift} Checklist</h2>
         <div style={st.pctRow}><span>{completed} of {tasks.length} complete</span><span>{pct}%</span></div>
-        <div style={st.pbar}><div style={{height:"100%",background:"#fff",borderRadius:"2px",width:pct+"%",transition:"width .4s"}}/></div>
+        <div style={st.pbar}><div style={{height:"100%",background:"#c8ddb8",borderRadius:"2px",width:pct+"%",transition:"width .4s"}}/></div>
         <div style={st.tasksWrap}>
           {tasks.map(function(task,i){return <TaskRow key={i} task={task} idx={i} isChecked={checked[i]} photoUrl={photos[i]} onToggle={function(){toggle(i);}} onUpload={handlePhotoUpload} uploadingIdx={uploadingIdx}/>; })}
         </div>
-        {photoErr?<p style={{fontSize:".75rem",color:"#ef4444",marginBottom:".5rem",textAlign:"center"}}>Photo upload failed — check connection and try again.</p>:null}
-        {submitErr?<p style={{fontSize:".75rem",color:"#ef4444",marginBottom:".5rem",textAlign:"center"}}>Submission failed — check connection and try again.</p>:null}
+        {photoErr?<p style={{fontSize:".75rem",color:"#c0604a",marginBottom:".5rem",textAlign:"center"}}>Photo upload failed — check connection and try again.</p>:null}
+        {submitErr?<p style={{fontSize:".75rem",color:"#c0604a",marginBottom:".5rem",textAlign:"center"}}>Submission failed — check connection and try again.</p>:null}
         <button style={Object.assign({},st.btnP,{opacity:(!allDone||submitting)?0.3:1})} disabled={!allDone||submitting} onClick={submitChecklist}>{submitting?"Submitting…":btnLabel}</button>
       </div>
     </div>
@@ -522,9 +524,9 @@ function App(){
   if(view==="success") return (
     <div style={Object.assign({},st.page,st.center)}>
       <div style={Object.assign({},st.card,{textAlign:"center"})}>
-        <div style={st.sicon}><CheckBig color="#fff"/></div>
-        <h2 style={{fontSize:"1.5rem",fontWeight:"600",marginBottom:".5rem"}}>All done.</h2>
-        <p style={{fontSize:".875rem",color:"#555",marginBottom:"2rem"}}>{shift} checklist for {sec} ({loc}) submitted by {name}.</p>
+        <div style={st.sicon}><CheckBig color="#c8ddb8"/></div>
+        <h2 style={{fontSize:"1.5rem",fontWeight:"600",marginBottom:".5rem",color:"#f0f8e8"}}>All done.</h2>
+        <p style={{fontSize:".875rem",color:"#a0c890",marginBottom:"2rem"}}>{shift} checklist for {sec} ({loc}) submitted by {name}.</p>
         <button style={st.btnP} onClick={resetHome}>New Checklist</button>
       </div>
     </div>
@@ -539,7 +541,7 @@ function App(){
           onChange={function(e){setAdminPw(e.target.value);setAdminErr(false);}}
           onKeyDown={function(e){if(e.key==="Enter")tryLogin();}}
         />
-        {adminErr?<p style={{fontSize:".75rem",color:"#ef4444",marginBottom:".75rem"}}>Incorrect password.</p>:null}
+        {adminErr?<p style={{fontSize:".75rem",color:"#c0604a",marginBottom:".75rem"}}>Incorrect password.</p>:null}
         <button style={st.btnP} onClick={tryLogin}>Enter</button>
       </div>
     </div>
@@ -563,7 +565,7 @@ function App(){
 
         {adminTab==="logs"?(
           <div>
-            {/* Toolbar */}
+            
             <div style={{display:"flex",gap:".5rem",marginBottom:"1rem",flexWrap:"wrap",alignItems:"center"}}>
               <button style={st.btnDl} onClick={function(){downloadCSV(logs);}} disabled={logs.length===0||deleting}>↓ CSV</button>
               <button style={st.btnG} onClick={fetchLogs} disabled={deleting}>↺ Refresh</button>
@@ -581,9 +583,9 @@ function App(){
               <button style={logs.length>0?Object.assign({},st.btnDanger,{marginLeft:"auto"}):Object.assign({},st.btnDanger,{marginLeft:"auto",opacity:.4,cursor:"not-allowed"})} disabled={logs.length===0||deleting} onClick={handleDeleteAll}>Delete all</button>
             </div>
 
-            {logsLoading?<p style={{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}}>Loading…</p>
-            :logsErr?<p style={{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}}>Failed to load. Check connection.</p>
-            :logs.length===0?<p style={{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}}>No submissions yet.</p>
+            {logsLoading?<p style={{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}}>Loading…</p>
+            :logsErr?<p style={{fontSize:".875rem",color:"#e07858",textAlign:"center",padding:"3rem 0"}}>Failed to load. Check connection.</p>
+            :logs.length===0?<p style={{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}}>No submissions yet.</p>
             :logs.map(function(log){
               const isSelected=selectedIds.indexOf(log.id)>=0;
               return(
@@ -592,21 +594,21 @@ function App(){
                   <div style={{flex:"1",cursor:"pointer"}} onClick={function(){selectMode?toggleSelect(log.id):setExpanded(expanded===log.id?null:log.id);}}>
                     <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
                       <div>
-                        <p style={{fontWeight:"500",fontSize:".875rem"}}>{log.name}</p>
-                        <p style={{fontSize:".7rem",color:"#555",marginTop:".2rem"}}>{log.location} · {log.section} · {log.shift}</p>
+                        <p style={{fontWeight:"500",fontSize:".875rem",color:"#e8f5e0"}}>{log.name}</p>
+                        <p style={{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem"}}>{log.location} · {log.section} · {log.shift}</p>
                       </div>
                       <div style={{textAlign:"right",flexShrink:"0",marginLeft:"1rem"}}>
-                        <p style={{fontSize:".7rem",color:"#444"}}>{new Date(log.created_at).toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"})}</p>
-                        <p style={{fontSize:".7rem",fontWeight:"500",marginTop:".2rem",color:log.completed===log.total?"#4ade80":"#f59e0b"}}>{log.completed}/{log.total}</p>
+                        <p style={{fontSize:".7rem",color:"#b8c8a8"}}>{new Date(log.created_at).toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"})}</p>
+                        <p style={{fontSize:".7rem",fontWeight:"500",marginTop:".2rem",color:log.completed===log.total?"#7ad86a":"#d4a860"}}>{log.completed}/{log.total}</p>
                       </div>
                     </div>
                     {!selectMode&&expanded===log.id?(
                       <div style={st.logExpand}>
                         {(log.tasks||[]).map(function(t,i){return(
-                          <div key={i} style={{display:"flex",alignItems:"center",gap:".5rem",fontSize:".75rem",marginBottom:".375rem",color:t.done?"#444":"#f59e0b"}}>
+                          <div key={i} style={{display:"flex",alignItems:"center",gap:".5rem",fontSize:".75rem",marginBottom:".375rem",color:t.done?"#5a8050":"#d4a860"}}>
                             <span>{t.done?"✓":"○"}</span>
                             <span style={t.done?{textDecoration:"line-through"}:{}}>{t.task}</span>
-                            {t.photoUrl?<a href={t.photoUrl} target="_blank" rel="noreferrer" style={{color:"#60a5fa",marginLeft:"auto",flexShrink:"0"}}>📷 view</a>:null}
+                            {t.photoUrl?<a href={t.photoUrl} target="_blank" rel="noreferrer" style={{color:"#7ab898",marginLeft:"auto",flexShrink:"0"}}>📷 view</a>:null}
                           </div>
                         );})}
                       </div>
@@ -620,34 +622,34 @@ function App(){
 
         {adminTab==="edit"?(
           <div>
-            <p style={{fontSize:".7rem",color:"#555",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Changes save instantly to all devices.{configSaving?" Saving…":""}</p>
+            <p style={{fontSize:".7rem",color:"#b8c8a8",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Changes save instantly to all devices.{configSaving?" Saving…":""}</p>
             <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);const secs=getSections(l);setESec(secs.length>0?secs[0]:"");setNewSecName("");}}/>; })}</div>
 
-            {/* Sections with remove buttons */}
+            
             <div style={{marginBottom:".75rem"}}>
-              <p style={{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".5rem"}}>Sections</p>
+              <p style={{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".5rem"}}>Sections</p>
               <div style={{display:"flex",flexWrap:"wrap",gap:".375rem",marginBottom:".5rem"}}>
                 {eSections.map(function(sc){
-                  return React.createElement("div",{key:sc,style:{display:"flex",alignItems:"center",gap:"0",border:"1px solid "+(eSec===sc?"#fff":"#222"),borderRadius:".5rem",overflow:"hidden"}},
-                    React.createElement("button",{style:{padding:".375rem .625rem",fontSize:".75rem",fontWeight:"500",background:eSec===sc?"#fff":"#141414",color:eSec===sc?"#000":"#555",cursor:"pointer",border:"none"},onClick:function(){setESec(sc);}},sc),
-                    eSections.length>1?React.createElement("button",{style:{padding:".375rem .375rem",fontSize:".7rem",background:eSec===sc?"#fff":"#141414",color:eSec===sc?"#999":"#333",cursor:"pointer",border:"none",borderLeft:"1px solid "+(eSec===sc?"#ddd":"#222")},onClick:function(e){e.stopPropagation();removeSection(eLoc,sc);}},"×"):null
+                  return React.createElement("div",{key:sc,style:{display:"flex",alignItems:"center",gap:"0",border:"1px solid "+(eSec===sc?"#c8ddb8":"#1e2e1e"),borderRadius:".5rem",overflow:"hidden"}},
+                    React.createElement("button",{style:{padding:".375rem .625rem",fontSize:".75rem",fontWeight:"500",background:eSec===sc?"#c8ddb8":"#101810",color:eSec===sc?"#0a130a":"#4d6848",cursor:"pointer",border:"none"},onClick:function(){setESec(sc);}},sc),
+                    eSections.length>1?React.createElement("button",{style:{padding:".375rem .375rem",fontSize:".7rem",background:eSec===sc?"#c8ddb8":"#101810",color:eSec===sc?"#3a6030":"#263826",cursor:"pointer",border:"none",borderLeft:"1px solid "+(eSec===sc?"#a0c898":"#1e2e1e")},onClick:function(e){e.stopPropagation();removeSection(eLoc,sc);}},"×"):null
                   );
                 })}
               </div>
-              {/* Add section */}
+              
               <div style={{display:"flex",gap:".5rem",alignItems:"center"}}>
                 <input style={Object.assign({},st.editInput,{flex:"1",padding:".5rem .75rem",fontSize:".8rem"})} placeholder="New section name…" value={newSecName} onChange={function(e){setNewSecName(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}}/>
                 <button style={Object.assign({},st.btnG,{flexShrink:"0"})} onClick={function(){if(newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}}>+ Add</button>
               </div>
             </div>
 
-            {/* Shift enable/disable toggles */}
+            
             {eSec?React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:"1rem"}},
-              React.createElement("p",{style:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#555",marginBottom:".75rem"}},"Active Shifts for "+eSec),
+              React.createElement("p",{style:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".75rem"}},"Active Shifts for "+eSec),
               React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:".5rem"}},
                 SHIFTS.map(function(sh){
                   const on=eEnabled[sh]!==false;
-                  return React.createElement("button",{key:sh,style:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".8rem",fontWeight:"500",border:"1px solid "+(on?"#fff":"#333"),background:on?"#fff":"transparent",color:on?"#000":"#555",cursor:"pointer"},onClick:function(){toggleShiftEnabled(eLoc,eSec,sh);}},sh);
+                  return React.createElement("button",{key:sh,style:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".8rem",fontWeight:"500",border:"1px solid "+(on?"#c8ddb8":"#263826"),background:on?"#c8ddb8":"transparent",color:on?"#0a130a":"#4d6848",cursor:"pointer"},onClick:function(){toggleShiftEnabled(eLoc,eSec,sh);}},sh);
                 })
               )
             ):null}
@@ -662,7 +664,7 @@ function App(){
                 });})
               ),
               React.createElement("button",{style:st.addBtn,onClick:function(){addTask(eLoc,eSec,eShift);}}, "+ Add task")
-            ):React.createElement("p",{style:{fontSize:".8rem",color:"#444",textAlign:"center",padding:"1rem 0"}},"No sections yet — add one above.")}
+            ):React.createElement("p",{style:{fontSize:".8rem",color:"#b8c8a8",textAlign:"center",padding:"1rem 0"}},"No sections yet — add one above.")}
           </div>
         ):null}
       </div>
