@@ -44,8 +44,8 @@ const STRUCTURE = {
   IRD:["IRD"]
 };
 const LOCS = ["Kitchen","FOH","Bar","IRD"];
-const SHIFTS = ["Opening","Closing","Weekly","Bi-Weekly","Monthly"];
-const DEFAULT_ENABLED = {Opening:true,Closing:true,Weekly:false,"Bi-Weekly":false,Monthly:false}; // Weekly+ off by default
+const SHIFTS = ["Opening","Closing","Overnight","Weekly","Bi-Weekly","Monthly"];
+const DEFAULT_ENABLED = {Opening:true,Closing:true,Overnight:false,Weekly:false,"Bi-Weekly":false,Monthly:false}; // Overnight/Weekly+ off by default
 const ADMIN_PW = "1hotel"; // client-side only — replace with Supabase auth (roadmap)
 
 // Default tasks — fallback only if Supabase config is empty
