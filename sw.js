@@ -1,15 +1,22 @@
 // Minimal service worker — enables PWA installability only.
-// No caching: all requests go to the network to keep submissions live.
-
+// No caching: all requests bypass HTTP cache to keep the app always fresh.
 self.addEventListener("install", function(e) {
   self.skipWaiting();
 });
-
 self.addEventListener("activate", function(e) {
-  e.waitUntil(self.clients.claim());
+  // Clear any existing caches from previous versions
+  e.waitUntil(
+    caches.keys().then(function(keys) {
+      return Promise.all(keys.map(function(key) { return caches.delete(key); }));
+    }).then(function() { return self.clients.claim(); })
+  );
 });
-
 self.addEventListener("fetch", function(e) {
-  // Pass all requests straight through to the network
-  e.respondWith(fetch(e.request));
+  // Bypass HTTP cache entirely — always fetch fresh from network
+  e.respondWith(
+    fetch(e.request, { cache: "no-store" }).catch(function() {
+      // If offline, just let the browser handle it naturally
+      return fetch(e.request);
+    })
+  );
 });
