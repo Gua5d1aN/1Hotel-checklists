@@ -125,6 +125,16 @@ async function uploadPhoto(file,path){
   if(!res.ok) throw new Error("Upload failed");
   return SB_URL+"/storage/v1/object/public/checklist-photos/"+path;
 }
+// Issue log helpers
+async function sbInsertIssue(row){
+  const res=await fetch(SB_URL+"/rest/v1/issue_logs",{method:"POST",headers:Object.assign({},HDRS,{"Prefer":"return=minimal"}),body:JSON.stringify(row)});
+  if(!res.ok) throw new Error("Submit failed");
+}
+async function sbFetchIssues(){
+  const res=await fetch(SB_URL+"/rest/v1/issue_logs?select=*&order=created_at.desc",{headers:HDRS});
+  if(!res.ok) throw new Error("Fetch failed");
+  return res.json();
+}
 // CSV export
 function toCSV(rows){
   const h=["ID","Submitted At","Name","Location","Section","Shift","Completed","Total","Tasks"];
@@ -319,6 +329,20 @@ function App(){
   const [eSec,setESec]=useState("Grill");
   const [eShift,setEShift]=useState("Opening");
   const [expanded,setExpanded]=useState(null);
+  // Issue log state
+  const [issueName,setIssueName]=useState("");
+  const [issueItem,setIssueItem]=useState("");
+  const [issuePhoto,setIssuePhoto]=useState(null);
+  const [issuePhotoUrl,setIssuePhotoUrl]=useState(null);
+  const [issueUploading,setIssueUploading]=useState(false);
+  const [issueSubmitting,setIssueSubmitting]=useState(false);
+  const [issueErr,setIssueErr]=useState("");
+  // Admin issue log state
+  const [issues,setIssues]=useState([]);
+  const [issuesLoading,setIssuesLoading]=useState(false);
+  const [issuesErr,setIssuesErr]=useState(false);
+  const [issueFilterDate,setIssueFilterDate]=useState("All");
+  const [issueFilterName,setIssueFilterName]=useState("");
 
   useEffect(function(){
     sbFetchConfig().then(function(config){setCls(config||deepClone(DT));setView("welcome");}).catch(function(){setCls(deepClone(DT));setView("welcome");});
@@ -332,7 +356,34 @@ function App(){
     try{setLogs(await sbFetchLogs());}catch(e){setLogsErr(true);}
     setLogsLoading(false);
   },[]);
+  const fetchIssues=useCallback(async function(){
+    setIssuesLoading(true);setIssuesErr(false);
+    try{setIssues(await sbFetchIssues());}catch(e){setIssuesErr(true);}
+    setIssuesLoading(false);
+  },[]);
   useEffect(function(){if(view==="admin"&&(adminTab==="logs"||adminTab==="results"))fetchLogs();},[view,adminTab,fetchLogs]);
+  useEffect(function(){if(view==="admin"&&adminTab==="issues")fetchIssues();},[view,adminTab,fetchIssues]);
+
+  const resetIssueForm=function(){setIssueName("");setIssueItem("");setIssuePhoto(null);setIssuePhotoUrl(null);setIssueErr("");};
+  const handleIssuePhotoUpload=async function(file){
+    setIssueUploading(true);setIssueErr("");
+    try{
+      const ext=file.name.split(".").pop()||"jpg";
+      const path="issues/"+Date.now()+"_"+issueItem.replace(/[^a-zA-Z0-9]/g,"_")+"."+ext;
+      const url=await uploadPhoto(file,path);
+      setIssuePhoto(file);setIssuePhotoUrl(url);
+    }catch(e){setIssueErr("Photo upload failed. Try again.");}
+    setIssueUploading(false);
+  };
+  const submitIssue=async function(){
+    if(!issueName.trim()||!issueItem.trim()||!issuePhotoUrl){setIssueErr("Please fill all fields and add a photo.");return;}
+    setIssueSubmitting(true);setIssueErr("");
+    try{
+      await sbInsertIssue({name:issueName.trim(),item_name:issueItem.trim(),photo_url:issuePhotoUrl});
+      setView("issueSuccess");
+    }catch(e){setIssueErr("Submission failed. Check connection.");}
+    setIssueSubmitting(false);
+  };
 
   const handleDeleteSelected=async function(){
     if(!selectedIds.length) return;
@@ -469,8 +520,7 @@ function App(){
             <span style={{fontSize:"1.2rem",color:"#c8d8b8"}}>→</span>
           </button>
           {[
-            {title:"Staff Equipment Training",desc:"Track equipment sign-offs & competencies"},
-            {title:"Maintenance & Equipment Logs",desc:"Log equipment issues & repairs"}
+            {title:"Staff Equipment Training",desc:"Track equipment sign-offs & competencies",soon:true},
           ].map(function(item){
             return React.createElement("div",{key:item.title,style:{width:"100%",background:"rgba(10,20,8,0.3)",border:"1px solid rgba(90,128,80,0.35)",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",opacity:"0.65"}},
               React.createElement("div",null,
@@ -480,6 +530,15 @@ function App(){
               React.createElement("span",{style:{fontSize:".65rem",letterSpacing:".1em",textTransform:"uppercase",color:"#b8c8a8",border:"1px solid rgba(90,128,80,0.5)",borderRadius:".375rem",padding:".25rem .5rem"}},"Soon")
             );
           })}
+          <button onClick={function(){resetIssueForm();setView("issueLog");}} style={{width:"100%",background:"rgba(10,20,8,0.5)",border:"1px solid #5a8050",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}
+            onMouseEnter={function(e){e.currentTarget.style.borderColor="#9ac880";}}
+            onMouseLeave={function(e){e.currentTarget.style.borderColor="#5a8050";}}>
+            <div>
+              <p style={{fontSize:".95rem",fontWeight:"600",color:"#ffffff",marginBottom:".2rem"}}>Maintenance & Equipment Logs</p>
+              <p style={{fontSize:".75rem",color:"#c8d8b8"}}>Log equipment issues & repairs</p>
+            </div>
+            <span style={{fontSize:"1.2rem",color:"#c8d8b8"}}>→</span>
+          </button>
         </div>
         <button style={{marginTop:"2.5rem",fontSize:".7rem",color:"rgba(200,220,180,0.2)",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"}} onClick={function(){setView("adminLogin");}}>Admin</button>
       </div>
@@ -533,6 +592,56 @@ function App(){
     </div>
   );
 
+  if(view==="issueLog") return (
+    <div style={Object.assign({},st.page,st.center)}>
+      <div style={st.card}>
+        <button style={st.backBtn} onClick={function(){resetIssueForm();setView("welcome");}}>← Back</button>
+        <p style={st.eyebrow}>Mise</p>
+        <h1 style={st.heading}>Log an Issue</h1>
+        <div style={st.stack}>
+          <div>
+            <label style={st.lbl}>Your Name</label>
+            <input style={st.field} placeholder="Enter your name" value={issueName} onChange={function(e){setIssueName(e.target.value);}}/>
+          </div>
+          <div>
+            <label style={st.lbl}>Item / Equipment</label>
+            <input style={st.field} placeholder="e.g. Fryer 2, Combi oven" value={issueItem} onChange={function(e){setIssueItem(e.target.value);}}/>
+          </div>
+          <div>
+            <label style={st.lbl}>Photo</label>
+            {issuePhotoUrl
+              ? <div style={{display:"flex",alignItems:"center",gap:".75rem",padding:".875rem 1rem",background:"#141414",border:"1px solid #222",borderRadius:".875rem"}}>
+                  <span style={{fontSize:"1.25rem"}}>📷</span>
+                  <span style={{fontSize:".8rem",color:"#4ade80",flex:"1"}}>Photo attached ✓</span>
+                  <button style={{background:"none",border:"none",color:"#555",fontSize:".75rem",cursor:"pointer"}} onClick={function(){setIssuePhoto(null);setIssuePhotoUrl(null);}}>Remove</button>
+                </div>
+              : <label style={{display:"block",width:"100%",padding:".875rem 1rem",background:"#141414",border:"1px dashed #333",borderRadius:".875rem",textAlign:"center",cursor:"pointer",color:issueUploading?"#555":"#f59e0b",fontSize:".875rem"}}>
+                  {issueUploading?"Uploading…":"📷 Take or upload photo"}
+                  <input type="file" accept="image/*" capture="environment" style={{display:"none"}} disabled={issueUploading}
+                    onChange={function(e){if(e.target.files&&e.target.files[0])handleIssuePhotoUpload(e.target.files[0]);}}/>
+                </label>
+            }
+          </div>
+          {issueErr?<p style={{fontSize:".75rem",color:"#ef4444",textAlign:"center"}}>{issueErr}</p>:null}
+          <button style={Object.assign({},st.btnP,{opacity:(!issueName.trim()||!issueItem.trim()||!issuePhotoUrl||issueSubmitting)?0.25:1})}
+            disabled={!issueName.trim()||!issueItem.trim()||!issuePhotoUrl||issueSubmitting}
+            onClick={submitIssue}>{issueSubmitting?"Submitting…":"Submit Issue →"}</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  if(view==="issueSuccess") return (
+    <div style={Object.assign({},st.page,st.center)}>
+      <div style={Object.assign({},st.card,{textAlign:"center"})}>
+        <div style={st.sicon}><CheckBig color="#c8ddb8"/></div>
+        <h2 style={{fontSize:"1.5rem",fontWeight:"600",marginBottom:".5rem",color:"#f0f8e8"}}>Issue logged.</h2>
+        <p style={{fontSize:".875rem",color:"#a0c890",marginBottom:"2rem"}}>{issueItem} logged by {issueName}.</p>
+        <button style={st.btnP} onClick={function(){resetIssueForm();setView("welcome");}}>Back to Home</button>
+      </div>
+    </div>
+  );
+
   if(view==="adminLogin") return (
     <div style={Object.assign({},st.page,st.center)}>
       <div style={st.card}>
@@ -559,6 +668,7 @@ function App(){
         <div style={st.tabRow}>
           <TabBtn label="Submission Log" active={adminTab==="logs"} onClick={function(){setAdminTab("logs");exitSelectMode();}}/>
           <TabBtn label="Results" active={adminTab==="results"} onClick={function(){setAdminTab("results");exitSelectMode();}}/>
+          <TabBtn label="Issue Log" active={adminTab==="issues"} onClick={function(){setAdminTab("issues");exitSelectMode();}}/>
           <TabBtn label="Edit Checklists" active={adminTab==="edit"} onClick={function(){setAdminTab("edit");exitSelectMode();}}/>
         </div>
 
@@ -618,6 +728,44 @@ function App(){
                 </div>
               );
             })}
+          </div>
+        ):null}
+
+        {adminTab==="issues"?(
+          <div>
+            <div style={{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}}>
+              <button style={st.btnG} onClick={fetchIssues} disabled={issuesLoading}>↺ Refresh</button>
+              <select style={st.fieldSm} value={issueFilterDate} onChange={function(e){setIssueFilterDate(e.target.value);}}>
+                {["All","Today","Last 7 days","Last 30 days"].map(function(d){return React.createElement("option",{key:d},d);})}
+              </select>
+              <input style={Object.assign({},st.fieldSm,{minWidth:"130px"})} placeholder="Filter by name…" value={issueFilterName} onChange={function(e){setIssueFilterName(e.target.value);}}/>
+            </div>
+            {issuesLoading?<p style={{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}}>Loading…</p>
+            :issuesErr?<p style={{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}}>Failed to load.</p>
+            :(function(){
+              const now=new Date();
+              const filtered=issues.filter(function(i){
+                const d=new Date(i.created_at);
+                const dateOk=issueFilterDate==="All"||(issueFilterDate==="Today"&&d.toDateString()===now.toDateString())||(issueFilterDate==="Last 7 days"&&(now-d)<7*86400000)||(issueFilterDate==="Last 30 days"&&(now-d)<30*86400000);
+                const nameOk=!issueFilterName.trim()||i.name.toLowerCase().includes(issueFilterName.toLowerCase());
+                return dateOk&&nameOk;
+              });
+              if(filtered.length===0) return React.createElement("p",{style:{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}},"No issues match filters.");
+              return filtered.map(function(issue){
+                return React.createElement("div",{key:issue.id,style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:".75rem"}},
+                  React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:".75rem"}},
+                    React.createElement("div",null,
+                      React.createElement("p",{style:{fontWeight:"600",fontSize:".9rem",color:"#f0f8e8",marginBottom:".2rem"}},issue.item_name),
+                      React.createElement("p",{style:{fontSize:".75rem",color:"#a0c890"}},issue.name),
+                      React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem"}},new Date(issue.created_at).toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"}))
+                    )
+                  ),
+                  issue.photo_url?React.createElement("a",{href:issue.photo_url,target:"_blank",rel:"noreferrer",style:{display:"block",borderRadius:".625rem",overflow:"hidden",border:"1px solid #222",maxWidth:"260px"}},
+                    React.createElement("img",{src:issue.photo_url,alt:issue.item_name,style:{width:"100%",display:"block",objectFit:"cover",maxHeight:"180px"}})
+                  ):null
+                );
+              });
+            })()}
           </div>
         ):null}
 
