@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<meta name="theme-color" content="#0e1f0e"/>
+<meta name="theme-color" content="#181530"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="Mise"/>
 <link rel="manifest" href="manifest.json"/>
@@ -13,30 +13,35 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/clash-grotesk@5/index.css"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-body{background:linear-gradient(160deg,#0e1f0e 0%,#111a0f 30%,#16180e 60%,#1a1208 100%);background-attachment:fixed;color:#dce8d4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+body{background:#181530;color:#C8C0E8;font-family:'Clash Grotesk',system-ui,sans-serif;min-height:100vh}
 button,input,select{font-family:inherit}
-::placeholder{color:#2d3e28}
-select option{background:#162016;color:#dce8d4}
+::placeholder{color:#4A4468}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2A2648;border-radius:2px}
+.nm-pill:active{transform:scale(0.97)}
+.nm-card:active{box-shadow:inset 4px 4px 10px rgba(0,0,0,0.5),inset -3px -3px 8px rgba(85,65,185,0.15)!important;transform:scale(0.99)}
+.nm-btn-pink:active{box-shadow:inset 3px 3px 8px rgba(185,15,75,0.6),inset -1px -1px 5px rgba(255,85,155,0.2)!important;transform:scale(0.98)}
+.nm-btn-amber:active{box-shadow:inset 3px 3px 7px rgba(0,0,0,0.5),inset -2px -2px 5px rgba(85,65,185,0.15)!important;transform:scale(0.98)}
+.nm-btn-sm:active{box-shadow:inset 3px 3px 6px rgba(0,0,0,0.5),inset -2px -2px 4px rgba(85,65,185,0.12)!important}
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 /*
-  Mise — Hospitality Shift Checklists
-  Created by Josh
-  All rights reserved.
+  Mise — Hospitality Operations Platform
+  Version 2.0
 */
 const { useState, useEffect, useCallback, useRef } = React;
 
-// Supabase connection
 const SB_URL = "https://xfrspqumcsxwxmjqsalg.supabase.co";
 const SB_KEY = "sb_publishable_3G8P3sjDyfR_7I-ISUiBbA_ahoLxRSq";
 const HDRS = {"Content-Type":"application/json","apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY};
 
-// App structure — locations are fixed, sections are dynamic via admin
 const STRUCTURE = {
   Kitchen:["Grill","Larder","Pans","Fryer","Overnight Only"],
   FOH:["Floor","Host / Reception","Terrace"],
@@ -45,35 +50,33 @@ const STRUCTURE = {
 };
 const LOCS = ["Kitchen","FOH","Bar","IRD"];
 const SHIFTS = ["Opening","Closing","Overnight","Weekly","Bi-Weekly","Monthly"];
-const DEFAULT_ENABLED = {Opening:true,Closing:true,Overnight:false,Weekly:false,"Bi-Weekly":false,Monthly:false}; // Overnight/Weekly+ off by default
-const ADMIN_PW = "1hotel"; // client-side only — replace with Supabase auth (roadmap)
+const DEFAULT_ENABLED = {Opening:true,Closing:true,Overnight:false,Weekly:false,"Bi-Weekly":false,Monthly:false};
+const ADMIN_PW = "1hotel";
 
-// Default tasks — fallback only if Supabase config is empty
 const DT = {
   Kitchen:{
-    Grill:{Opening:[{text:"Light and calibrate grill to temp",requiresPhoto:false},{text:"Clean grill grates and drip trays",requiresPhoto:false},{text:"Check protein par and pull from cool room",requiresPhoto:false},{text:"Set up sauces and seasoning mise en place",requiresPhoto:false},{text:"Review service notes and specials",requiresPhoto:false}],Closing:[{text:"Cool down and brush grill grates",requiresPhoto:false},{text:"Empty and clean drip trays",requiresPhoto:false},{text:"Wrap and store all proteins correctly",requiresPhoto:false},{text:"Wipe down entire grill station",requiresPhoto:false},{text:"Complete section temp log",requiresPhoto:false}]},
-    Larder:{Opening:[{text:"Check and rotate all larder mise en place",requiresPhoto:false},{text:"Portion and label salads and cold starters",requiresPhoto:false},{text:"Confirm garnish stock and prep as needed",requiresPhoto:false},{text:"Check dressings and cold sauces",requiresPhoto:false},{text:"Review covers and allergy flags",requiresPhoto:false}],Closing:[{text:"Wrap and date all open products",requiresPhoto:false},{text:"Clean and sanitise larder benches and boards",requiresPhoto:false},{text:"Store all mise en place correctly",requiresPhoto:false},{text:"Check fridge temps and log",requiresPhoto:false},{text:"Clear ice bath and dry thoroughly",requiresPhoto:false}]},
-    Pans:{Opening:[{text:"Confirm burner function across all rings",requiresPhoto:false},{text:"Set up sauces, stocks and mise en place",requiresPhoto:false},{text:"Check pan and utensil stock",requiresPhoto:false},{text:"Pull and check proteins for service",requiresPhoto:false},{text:"Review daily specials and timing",requiresPhoto:false}],Closing:[{text:"Deglaze and clean all pans",requiresPhoto:false},{text:"Wipe down stove tops and burners",requiresPhoto:false},{text:"Store remaining sauces and stocks correctly",requiresPhoto:false},{text:"Clean and return all utensils",requiresPhoto:false},{text:"Wipe down full station surface",requiresPhoto:false}]},
-    Fryer:{Opening:[{text:"Check oil quality and top up if needed",requiresPhoto:false},{text:"Heat fryers to correct temp and log reading",requiresPhoto:false},{text:"Set up crumbing and battering station",requiresPhoto:false},{text:"Check frozen and fresh product levels",requiresPhoto:false},{text:"Confirm holding equipment is functional",requiresPhoto:false}],Closing:[{text:"Filter or change oil as required",requiresPhoto:false},{text:"Cool fryers fully before covering",requiresPhoto:false},{text:"Clean baskets and exterior thoroughly",requiresPhoto:false},{text:"Dispose of waste oil correctly",requiresPhoto:false},{text:"Complete oil change log",requiresPhoto:false}]},
-    "Overnight Only":{Opening:[],Closing:[],Overnight:[],Weekly:[],"Bi-Weekly":[],Monthly:[]}
+    Grill:{Opening:[{text:"Light and calibrate grill to temp",requiresPhoto:false},{text:"Clean grill grates and drip trays",requiresPhoto:false},{text:"Check protein par and pull from cool room",requiresPhoto:false},{text:"Set up sauces and seasoning mise en place",requiresPhoto:false},{text:"Review service notes and specials",requiresPhoto:false}],Closing:[{text:"Cool down and brush grill grates",requiresPhoto:false},{text:"Empty and clean drip trays",requiresPhoto:false},{text:"Wrap and store all proteins correctly",requiresPhoto:false},{text:"Wipe down entire grill station",requiresPhoto:false},{text:"Complete section temp log",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    Larder:{Opening:[{text:"Check and rotate all larder mise en place",requiresPhoto:false},{text:"Portion and label salads and cold starters",requiresPhoto:false},{text:"Confirm garnish stock and prep as needed",requiresPhoto:false},{text:"Check dressings and cold sauces",requiresPhoto:false},{text:"Review covers and allergy flags",requiresPhoto:false}],Closing:[{text:"Wrap and date all open products",requiresPhoto:false},{text:"Clean and sanitise larder benches and boards",requiresPhoto:false},{text:"Store all mise en place correctly",requiresPhoto:false},{text:"Check fridge temps and log",requiresPhoto:false},{text:"Clear ice bath and dry thoroughly",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    Pans:{Opening:[{text:"Confirm burner function across all rings",requiresPhoto:false},{text:"Set up sauces, stocks and mise en place",requiresPhoto:false},{text:"Check pan and utensil stock",requiresPhoto:false},{text:"Pull and check proteins for service",requiresPhoto:false},{text:"Review daily specials and timing",requiresPhoto:false}],Closing:[{text:"Deglaze and clean all pans",requiresPhoto:false},{text:"Wipe down stove tops and burners",requiresPhoto:false},{text:"Store remaining sauces and stocks correctly",requiresPhoto:false},{text:"Clean and return all utensils",requiresPhoto:false},{text:"Wipe down full station surface",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    Fryer:{Opening:[{text:"Check oil quality and top up if needed",requiresPhoto:false},{text:"Heat fryers to correct temp and log reading",requiresPhoto:false},{text:"Set up crumbing and battering station",requiresPhoto:false},{text:"Check frozen and fresh product levels",requiresPhoto:false},{text:"Confirm holding equipment is functional",requiresPhoto:false}],Closing:[{text:"Filter or change oil as required",requiresPhoto:false},{text:"Cool fryers fully before covering",requiresPhoto:false},{text:"Clean baskets and exterior thoroughly",requiresPhoto:false},{text:"Dispose of waste oil correctly",requiresPhoto:false},{text:"Complete oil change log",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    "Overnight Only":{Opening:[],Closing:[],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]}
   },
   FOH:{
-    Floor:{Opening:[{text:"Set all tables to restaurant standard",requiresPhoto:false},{text:"Polish glassware and cutlery",requiresPhoto:false},{text:"Check reservations and flag dietary requirements",requiresPhoto:false},{text:"Brief team on specials and 86d items",requiresPhoto:false},{text:"Confirm menus are clean and current",requiresPhoto:false}],Closing:[{text:"Clear, clean and reset all tables",requiresPhoto:false},{text:"Return all glassware and linen to storage",requiresPhoto:false},{text:"Complete section side duties",requiresPhoto:false},{text:"Log any guest feedback or incidents",requiresPhoto:false},{text:"Leave handover notes for next shift",requiresPhoto:false}]},
-    "Host / Reception":{Opening:[{text:"Review full reservation sheet for the day",requiresPhoto:false},{text:"Confirm covers, table allocations and special requests",requiresPhoto:false},{text:"Brief floor team on VIPs and dietary flags",requiresPhoto:false},{text:"Ensure reception area is clean and presentable",requiresPhoto:false},{text:"Test reservation system and phone line",requiresPhoto:false}],Closing:[{text:"Confirm all reservations actioned and noted",requiresPhoto:false},{text:"Update any no-shows or walk-ins in system",requiresPhoto:false},{text:"Leave handover notes for next shift",requiresPhoto:false},{text:"Secure reservation records",requiresPhoto:false},{text:"Tidy and reset reception area",requiresPhoto:false}]},
-    Terrace:{Opening:[{text:"Check weather and confirm terrace is open",requiresPhoto:false},{text:"Set terrace tables and chairs to standard",requiresPhoto:false},{text:"Confirm heaters or umbrellas are operational",requiresPhoto:false},{text:"Check terrace menus are clean and stocked",requiresPhoto:false},{text:"Ensure terrace is swept and clear of debris",requiresPhoto:false}],Closing:[{text:"Clear and stack all terrace furniture",requiresPhoto:false},{text:"Store cushions and linens correctly",requiresPhoto:false},{text:"Secure heaters and umbrellas",requiresPhoto:false},{text:"Sweep terrace and dispose of waste",requiresPhoto:false},{text:"Lock terrace access",requiresPhoto:false}]}
+    Floor:{Opening:[{text:"Set all tables to restaurant standard",requiresPhoto:false},{text:"Polish glassware and cutlery",requiresPhoto:false},{text:"Check reservations and flag dietary requirements",requiresPhoto:false},{text:"Brief team on specials and 86d items",requiresPhoto:false},{text:"Confirm menus are clean and current",requiresPhoto:false}],Closing:[{text:"Clear, clean and reset all tables",requiresPhoto:false},{text:"Return all glassware and linen to storage",requiresPhoto:false},{text:"Complete section side duties",requiresPhoto:false},{text:"Log any guest feedback or incidents",requiresPhoto:false},{text:"Leave handover notes for next shift",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    "Host / Reception":{Opening:[{text:"Review full reservation sheet for the day",requiresPhoto:false},{text:"Confirm covers, table allocations and special requests",requiresPhoto:false},{text:"Brief floor team on VIPs and dietary flags",requiresPhoto:false},{text:"Ensure reception area is clean and presentable",requiresPhoto:false},{text:"Test reservation system and phone line",requiresPhoto:false}],Closing:[{text:"Confirm all reservations actioned and noted",requiresPhoto:false},{text:"Update any no-shows or walk-ins in system",requiresPhoto:false},{text:"Leave handover notes for next shift",requiresPhoto:false},{text:"Secure reservation records",requiresPhoto:false},{text:"Tidy and reset reception area",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    Terrace:{Opening:[{text:"Check weather and confirm terrace is open",requiresPhoto:false},{text:"Set terrace tables and chairs to standard",requiresPhoto:false},{text:"Confirm heaters or umbrellas are operational",requiresPhoto:false},{text:"Check terrace menus are clean and stocked",requiresPhoto:false},{text:"Ensure terrace is swept and clear of debris",requiresPhoto:false}],Closing:[{text:"Clear and stack all terrace furniture",requiresPhoto:false},{text:"Store cushions and linens correctly",requiresPhoto:false},{text:"Secure heaters and umbrellas",requiresPhoto:false},{text:"Sweep terrace and dispose of waste",requiresPhoto:false},{text:"Lock terrace access",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]}
   },
   Bar:{
-    "Crane Bar":{Opening:[{text:"Restock bar fridge to par",requiresPhoto:false},{text:"Check spirits, liqueurs and garnish levels",requiresPhoto:false},{text:"Prep fresh juices and house syrups",requiresPhoto:false},{text:"Polish all glassware",requiresPhoto:false},{text:"Test bar equipment including taps, blenders and ice machine",requiresPhoto:false}],Closing:[{text:"Discard perishable garnishes",requiresPhoto:false},{text:"Wrap and refrigerate juices and syrups",requiresPhoto:false},{text:"Wipe down full bar surface and taps",requiresPhoto:false},{text:"Cash up bar POS and reconcile",requiresPhoto:false},{text:"Complete waste log",requiresPhoto:false}]},
-    "Back Bar":{Opening:[{text:"Check back bar stock levels and restock",requiresPhoto:false},{text:"Confirm all spirits and liqueurs are labelled",requiresPhoto:false},{text:"Ensure back bar fridge is at correct temp",requiresPhoto:false},{text:"Restock bar consumables including straws, napkins and picks",requiresPhoto:false},{text:"Clean and organise back bar storage",requiresPhoto:false}],Closing:[{text:"Lock spirits fridge and back bar storage",requiresPhoto:false},{text:"Restock for next shift where possible",requiresPhoto:false},{text:"Wipe down all back bar surfaces",requiresPhoto:false},{text:"Reconcile any stock variances",requiresPhoto:false},{text:"Secure and lock back bar area",requiresPhoto:false}]},
-    "LVL1 Bar":{Opening:[{text:"Restock LVL1 bar fridge to par",requiresPhoto:false},{text:"Check spirit and mixer levels",requiresPhoto:false},{text:"Set up bar snacks and garnish station",requiresPhoto:false},{text:"Polish glassware and set bar to standard",requiresPhoto:false},{text:"Test POS and confirm menu is current",requiresPhoto:false}],Closing:[{text:"Clear and clean full bar top",requiresPhoto:false},{text:"Wrap and store all perishables",requiresPhoto:false},{text:"Cash up LVL1 POS",requiresPhoto:false},{text:"Lock bar fridges and spirit storage",requiresPhoto:false},{text:"Complete end-of-shift handover note",requiresPhoto:false}]}
+    "Crane Bar":{Opening:[{text:"Restock bar fridge to par",requiresPhoto:false},{text:"Check spirits, liqueurs and garnish levels",requiresPhoto:false},{text:"Prep fresh juices and house syrups",requiresPhoto:false},{text:"Polish all glassware",requiresPhoto:false},{text:"Test bar equipment including taps, blenders and ice machine",requiresPhoto:false}],Closing:[{text:"Discard perishable garnishes",requiresPhoto:false},{text:"Wrap and refrigerate juices and syrups",requiresPhoto:false},{text:"Wipe down full bar surface and taps",requiresPhoto:false},{text:"Cash up bar POS and reconcile",requiresPhoto:false},{text:"Complete waste log",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    "Back Bar":{Opening:[{text:"Check back bar stock levels and restock",requiresPhoto:false},{text:"Confirm all spirits and liqueurs are labelled",requiresPhoto:false},{text:"Ensure back bar fridge is at correct temp",requiresPhoto:false},{text:"Restock bar consumables including straws, napkins and picks",requiresPhoto:false},{text:"Clean and organise back bar storage",requiresPhoto:false}],Closing:[{text:"Lock spirits fridge and back bar storage",requiresPhoto:false},{text:"Restock for next shift where possible",requiresPhoto:false},{text:"Wipe down all back bar surfaces",requiresPhoto:false},{text:"Reconcile any stock variances",requiresPhoto:false},{text:"Secure and lock back bar area",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]},
+    "LVL1 Bar":{Opening:[{text:"Restock LVL1 bar fridge to par",requiresPhoto:false},{text:"Check spirit and mixer levels",requiresPhoto:false},{text:"Set up bar snacks and garnish station",requiresPhoto:false},{text:"Polish glassware and set bar to standard",requiresPhoto:false},{text:"Test POS and confirm menu is current",requiresPhoto:false}],Closing:[{text:"Clear and clean full bar top",requiresPhoto:false},{text:"Wrap and store all perishables",requiresPhoto:false},{text:"Cash up LVL1 POS",requiresPhoto:false},{text:"Lock bar fridges and spirit storage",requiresPhoto:false},{text:"Complete end-of-shift handover note",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]}
   },
   IRD:{
-    IRD:{Opening:[{text:"Check tray setup and linen stock",requiresPhoto:false},{text:"Confirm delivery equipment is clean and ready",requiresPhoto:false},{text:"Review incoming orders for the shift",requiresPhoto:false},{text:"Confirm lift access and floor coverage plan",requiresPhoto:false},{text:"Brief team on menu updates or item availability",requiresPhoto:false}],Closing:[{text:"Collect all outstanding trays from guest floors",requiresPhoto:false},{text:"Log any unreturned items or breakages",requiresPhoto:false},{text:"Store trays and equipment correctly",requiresPhoto:false},{text:"Complete shift order log",requiresPhoto:false},{text:"Leave handover notes for overnight team",requiresPhoto:false}]}
+    IRD:{Opening:[{text:"Check tray setup and linen stock",requiresPhoto:false},{text:"Confirm delivery equipment is clean and ready",requiresPhoto:false},{text:"Review incoming orders for the shift",requiresPhoto:false},{text:"Confirm lift access and floor coverage plan",requiresPhoto:false},{text:"Brief team on menu updates or item availability",requiresPhoto:false}],Closing:[{text:"Collect all outstanding trays from guest floors",requiresPhoto:false},{text:"Log any unreturned items or breakages",requiresPhoto:false},{text:"Store trays and equipment correctly",requiresPhoto:false},{text:"Complete shift order log",requiresPhoto:false},{text:"Leave handover notes for overnight team",requiresPhoto:false}],Overnight:[],Weekly:[],'Bi-Weekly':[],Monthly:[]}
   }
 };
 
 function deepClone(o){return JSON.parse(JSON.stringify(o));}
-// Ensures saved config is compatible with current app version
 function migrate(cl){
   const u=deepClone(cl);
   LOCS.forEach(function(l){
@@ -92,7 +95,6 @@ function migrate(cl){
   return u;
 }
 
-// Supabase helpers
 async function sbFetchConfig(){
   const res=await fetch(SB_URL+"/rest/v1/checklist_config?select=config&id=eq.1",{headers:HDRS});
   if(!res.ok) throw new Error("Config fetch failed");
@@ -125,7 +127,6 @@ async function uploadPhoto(file,path){
   if(!res.ok) throw new Error("Upload failed");
   return SB_URL+"/storage/v1/object/public/checklist-photos/"+path;
 }
-// Issue log helpers
 async function sbInsertIssue(row){
   const res=await fetch(SB_URL+"/rest/v1/issue_logs",{method:"POST",headers:Object.assign({},HDRS,{"Prefer":"return=minimal"}),body:JSON.stringify(row)});
   if(!res.ok) throw new Error("Submit failed");
@@ -135,7 +136,6 @@ async function sbFetchIssues(){
   if(!res.ok) throw new Error("Fetch failed");
   return res.json();
 }
-// CSV export
 function toCSV(rows){
   const h=["ID","Submitted At","Name","Location","Section","Shift","Completed","Total","Tasks"];
   const lines=rows.map(function(r){return[r.id,r.created_at,r.name,r.location,r.section,r.shift,r.completed,r.total,JSON.stringify(r.tasks)].map(function(v){return'"'+String(v).replace(/"/g,'""')+'"';}).join(",");});
@@ -149,102 +149,220 @@ function downloadCSV(rows){
   URL.revokeObjectURL(url);
 }
 
-// Shared styles — palette derived from 1 Hotel leaf photography
-const st={
-  page:{minHeight:"100vh",background:"transparent",color:"#f0ede8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"},
-  center:{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem"},
-  col:{display:"flex",flexDirection:"column",padding:"2rem 1.25rem"},
-  card:{width:"100%",maxWidth:"360px"},
-  inner:{maxWidth:"360px",width:"100%",margin:"0 auto",display:"flex",flexDirection:"column",flex:"1"},
-  adminWrap:{maxWidth:"640px",width:"100%",margin:"0 auto"},
-  eyebrow:{fontSize:"1rem",letterSpacing:".2em",textTransform:"uppercase",color:"#f0ede8",marginBottom:".4rem",textAlign:"center",fontWeight:"600"},
-  heading:{fontSize:"1.5rem",fontWeight:"600",textAlign:"center",marginBottom:"2rem",color:"#ffffff"},
-  lbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",display:"block",marginBottom:".5rem"},
-  field:{width:"100%",background:"rgba(10,20,8,0.55)",border:"1px solid #3a5a2a",borderRadius:".875rem",padding:".875rem 1rem",color:"#f0ede8",fontSize:".9rem",fontFamily:"inherit",outline:"none"},
-  fieldSm:{background:"rgba(10,20,8,0.55)",border:"1px solid #3a5a2a",borderRadius:".75rem",padding:".5rem .75rem",color:"#f0ede8",fontSize:".8rem",fontFamily:"inherit",outline:"none",flex:"1"},
-  grid2:{display:"grid",gridTemplateColumns:"1fr 1fr",gap:".5rem"},
-  pillBase:{width:"100%",padding:".875rem .75rem",borderRadius:".875rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",color:"#d8e8c8",cursor:"pointer",textAlign:"center"},
-  pillOn:{background:"#d4e8b8",color:"#0a1a08",borderColor:"#d4e8b8"},
-  btnP:{width:"100%",padding:"1rem",borderRadius:".875rem",background:"#d4e8b8",color:"#0a1a08",fontSize:".875rem",fontWeight:"700",border:"none",cursor:"pointer"},
-  btnG:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #3a5a2a",background:"transparent",color:"#b8c8a8",fontSize:".8rem",cursor:"pointer"},
-  btnDl:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #3a7a3a",background:"transparent",color:"#7ad86a",fontSize:".8rem",cursor:"pointer"},
-  btnDanger:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #7a3820",background:"transparent",color:"#e07858",fontSize:".8rem",cursor:"pointer"},
-  btnDangerDim:{padding:".625rem 1.25rem",borderRadius:".875rem",border:"1px solid #2a3a20",background:"transparent",color:"#6a7858",fontSize:".8rem",cursor:"not-allowed",opacity:"0.4"},
-  backBtn:{background:"none",border:"none",color:"#b8c8a8",fontSize:".85rem",cursor:"pointer",padding:".25rem 0",textAlign:"left",display:"block",marginBottom:"1.5rem"},
-  stack:{display:"flex",flexDirection:"column",gap:".75rem"},
-  pbar:{height:"3px",background:"rgba(10,20,8,0.5)",borderRadius:"2px",overflow:"hidden",marginBottom:"1.25rem"},
-  taskBtn:{width:"100%",display:"flex",alignItems:"center",gap:"1rem",padding:"1rem",borderRadius:".875rem",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",cursor:"pointer",textAlign:"left"},
-  taskBtnDone:{background:"rgba(10,20,8,0.25)",borderColor:"rgba(50,80,40,0.4)"},
-  circle:{width:"1.5rem",height:"1.5rem",borderRadius:"50%",border:"2px solid #5a8050",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:"0"},
-  circleOn:{background:"#d4e8b8",borderColor:"#d4e8b8"},
-  sicon:{width:"4rem",height:"4rem",borderRadius:"50%",background:"rgba(10,20,8,0.5)",border:"1px solid #3a5a2a",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",marginBottom:"1.5rem"},
-  adminLink:{marginTop:"2.5rem",fontSize:".7rem",color:"rgba(180,200,160,0.25)",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"},
-  tabRow:{display:"flex",gap:".5rem",marginBottom:"1.5rem",flexWrap:"wrap"},
-  tab:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".85rem",fontWeight:"500",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",color:"#b8c8a8",cursor:"pointer"},
-  tabOn:{background:"#d4e8b8",color:"#0a1a08",borderColor:"#d4e8b8"},
-  logCard:{width:"100%",background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".875rem",padding:"1rem",textAlign:"left",marginBottom:".5rem",display:"flex",alignItems:"flex-start",gap:".75rem"},
-  logCardSelected:{borderColor:"#e07858",background:"rgba(60,15,5,0.5)"},
-  logExpand:{marginTop:".75rem",paddingTop:".75rem",borderTop:"1px solid #3a5a2a"},
-  chipRow:{display:"flex",flexWrap:"wrap",gap:".375rem",marginBottom:".75rem"},
-  chip:{padding:".375rem .75rem",borderRadius:".5rem",fontSize:".75rem",fontWeight:"500",border:"1px solid #3a5a2a",background:"rgba(10,20,8,0.45)",color:"#b8c8a8",cursor:"pointer"},
-  chipOn:{background:"#d4e8b8",color:"#0a1a08",borderColor:"#d4e8b8"},
-  editRow:{display:"flex",gap:".5rem",alignItems:"center",marginBottom:".5rem"},
-  editInput:{flex:"1",background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".625rem",padding:".75rem",fontSize:".875rem",color:"#f0ede8",fontFamily:"inherit",outline:"none"},
-  rmBtn:{background:"none",border:"none",color:"#5a7850",fontSize:"1.5rem",cursor:"pointer",width:"2rem",flexShrink:"0",lineHeight:"1"},
-  addBtn:{width:"100%",padding:".875rem",borderRadius:".875rem",border:"1px dashed #4a6840",background:"transparent",color:"#b8c8a8",fontSize:".875rem",cursor:"pointer"},
-  rowSB:{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.75rem"},
-  pctRow:{display:"flex",justifyContent:"space-between",fontSize:".7rem",color:"#b8c8a8",marginBottom:".5rem"},
-  tasksWrap:{flex:"1",marginBottom:"1.25rem"},
-  uploadBtn:{background:"transparent",border:"1px solid #a07840",color:"#d4a860",borderRadius:".625rem",padding:".375rem .875rem",fontSize:".75rem",cursor:"pointer",fontFamily:"inherit"},
-  photoToggle:{background:"none",border:"1px solid #4a6840",borderRadius:".5rem",padding:".35rem .5rem",fontSize:".85rem",cursor:"pointer",flexShrink:"0"},
-  photoToggleOn:{borderColor:"#a07840",background:"rgba(160,120,64,.2)"},
-  statBox:{background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".875rem",padding:"1rem 1.25rem",flex:"1",minWidth:"100px"},
-  sectionLbl:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".75rem",display:"block"},
-  checkbox:{width:"1.1rem",height:"1.1rem",accentColor:"#e07858",cursor:"pointer",flexShrink:"0",marginTop:".15rem"},
+function groupLogsByDate(logs){
+  const groups={};const keys=[];
+  logs.forEach(function(log){
+    const d=new Date(log.created_at),now=new Date(),y=new Date(now);
+    y.setDate(y.getDate()-1);
+    let dk;
+    if(d.toDateString()===now.toDateString()) dk="Today \u2014 "+d.toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+    else if(d.toDateString()===y.toDateString()) dk="Yesterday \u2014 "+d.toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+    else dk=d.toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"});
+    if(!groups[dk]){groups[dk]={};keys.push(dk);}
+    if(!groups[dk][log.location]) groups[dk][log.location]=[];
+    groups[dk][log.location].push(log);
+  });
+  return {groups,keys};
+}
+function groupIssuesByDate(issues){
+  const groups={};const keys=[];
+  issues.forEach(function(issue){
+    const d=new Date(issue.created_at),now=new Date(),y=new Date(now);
+    y.setDate(y.getDate()-1);
+    let dk;
+    if(d.toDateString()===now.toDateString()) dk="Today \u2014 "+d.toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+    else if(d.toDateString()===y.toDateString()) dk="Yesterday \u2014 "+d.toLocaleDateString("en-AU",{day:"numeric",month:"short"});
+    else dk=d.toLocaleDateString("en-AU",{weekday:"short",day:"numeric",month:"short"});
+    if(!groups[dk]){groups[dk]=[];keys.push(dk);}
+    groups[dk].push(issue);
+  });
+  return {groups,keys};
+}
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const C={bg:"#181530",surface:"#1D1A38",well:"#141228",pink:"#E8297A",teal:"#0DD8C4",amber:"#C4803A",t1:"#FFFFFF",t2:"#C8C0E8",t3:"#7A72A0",t4:"#4A4468"};
+const SH={
+  up:"6px 6px 14px rgba(0,0,0,0.62),-4px -4px 10px rgba(85,65,185,0.22)",
+  upMd:"5px 5px 12px rgba(0,0,0,0.58),-3px -3px 8px rgba(85,65,185,0.2)",
+  upSm:"4px 4px 9px rgba(0,0,0,0.55),-2px -2px 6px rgba(85,65,185,0.18)",
+  down:"inset 4px 4px 10px rgba(0,0,0,0.55),inset -2px -2px 7px rgba(85,65,185,0.18)",
+  downSm:"inset 3px 3px 7px rgba(0,0,0,0.5),inset -2px -2px 5px rgba(85,65,185,0.15)",
+  teal:"4px 4px 12px rgba(10,185,168,0.5),-2px -2px 8px rgba(13,216,196,0.22)",
+  pink:"5px 5px 14px rgba(185,15,75,0.65),-2px -2px 10px rgba(255,85,155,0.22)",
+  amber:"4px 4px 10px rgba(185,100,20,0.4),-2px -2px 6px rgba(196,128,58,0.15)",
+  frame:"14px 14px 30px rgba(0,0,0,0.7),-8px -8px 20px rgba(85,65,185,0.18)"
 };
 
-function Pill(p){return React.createElement("button",{style:Object.assign({},st.pillBase,p.active?st.pillOn:{}),onClick:p.onClick},p.label);}
-function TabBtn(p){return React.createElement("button",{style:Object.assign({},st.tab,p.active?st.tabOn:{}),onClick:p.onClick},p.label);}
-function Chip(p){return React.createElement("button",{style:Object.assign({},st.chip,p.active?st.chipOn:{}),onClick:p.onClick},p.label);}
-function CheckTick(){return React.createElement("svg",{width:"14",height:"14",viewBox:"0 0 24 24",fill:"none",stroke:"#0a130a",strokeWidth:"3",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
-function CheckBig(p){return React.createElement("svg",{width:"28",height:"28",viewBox:"0 0 24 24",fill:"none",stroke:p.color,strokeWidth:"2.5",strokeLinecap:"round",strokeLinejoin:"round"},React.createElement("path",{d:"M5 13l4 4L19 7"}));}
+// ── Components ────────────────────────────────────────────────────────────────
+function Wordmark({size="1.25rem"}){
+  return <div style={{display:"flex",alignItems:"center",gap:"0.35rem"}}>
+    <span style={{fontFamily:"Georgia,'Book Antiqua',Palatino,serif",fontStyle:"italic",fontSize:size,color:C.t1,letterSpacing:"-0.02em",textShadow:"1px 1px 3px rgba(0,0,0,0.5)"}}>mise</span>
+    <div style={{width:"5px",height:"5px",background:C.pink,borderRadius:"1px",transform:"rotate(45deg)",boxShadow:"1px 1px 4px rgba(185,15,75,0.5)",flexShrink:0}}/>
+  </div>;
+}
+function NavBar({onBack,backLabel="Back",right=null}){
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.75rem"}}>
+    <button style={{background:"none",border:"none",color:C.t4,fontSize:"0.8rem",cursor:"pointer",padding:0,fontFamily:"inherit",display:"flex",alignItems:"center",gap:"5px"}} onClick={onBack}>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke={C.t4} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+      {backLabel}
+    </button>
+    <Wordmark/>
+    <div style={{width:"40px",textAlign:"right"}}>{right}</div>
+  </div>;
+}
+function Frame({children,maxWidth="360px"}){
+  return <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem"}}>
+    <div style={{background:C.bg,borderRadius:"2.25rem",boxShadow:SH.frame,padding:"2rem 1.5rem",width:"100%",maxWidth,position:"relative"}}>
+      <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:"52px",height:"3px",background:C.pink,borderRadius:"0 0 4px 4px"}}/>
+      {children}
+    </div>
+  </div>;
+}
+function ColFrame({children,maxWidth="640px"}){
+  return <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",padding:"2rem 1.5rem"}}>
+    <div style={{maxWidth,width:"100%",margin:"0 auto",flex:1,display:"flex",flexDirection:"column"}}>
+      {children}
+    </div>
+  </div>;
+}
+function Lbl({children}){
+  return <div style={{fontSize:"0.6rem",letterSpacing:"0.16em",textTransform:"uppercase",color:C.pink,opacity:0.75,marginBottom:"0.6rem"}}>{children}</div>;
+}
+function SecLbl({children}){
+  return <div style={{fontSize:"0.58rem",letterSpacing:"0.14em",textTransform:"uppercase",color:C.t4,marginBottom:"0.6rem",display:"flex",alignItems:"center",gap:"0.4rem"}}>
+    <div style={{width:"3px",height:"3px",background:C.t4,borderRadius:"50%",flexShrink:0}}/>
+    {children}
+  </div>;
+}
+function DateHdr({label,count}){
+  return <div style={{display:"flex",alignItems:"center",gap:"0.75rem",marginBottom:"0.875rem",marginTop:"0.25rem"}}>
+    <span style={{fontSize:"0.62rem",fontWeight:600,letterSpacing:"0.14em",textTransform:"uppercase",color:C.pink,whiteSpace:"nowrap",opacity:0.85}}>{label}</span>
+    <div style={{flex:1,height:"1px",background:"#2A2648"}}/>
+    {count!=null&&<span style={{fontSize:"0.62rem",color:C.t4,whiteSpace:"nowrap"}}>{count} {count===1?"submission":"submissions"}</span>}
+  </div>;
+}
+function Pill({label,active,onClick}){
+  return <button className="nm-pill" onClick={onClick} style={{background:active?C.teal:C.surface,boxShadow:active?SH.teal:SH.upSm,border:active?"none":"none",borderRadius:"12px",padding:"0.75rem 0.5rem",fontSize:"0.78rem",fontWeight:active?600:500,color:active?"#0C0A22":C.t3,cursor:"pointer",textAlign:"center",width:"100%",transition:"all 0.18s"}}>{label}</button>;
+}
+function TabBtn({label,active,onClick}){
+  return <button className="nm-pill" onClick={onClick} style={{background:active?C.teal:C.surface,boxShadow:active?SH.teal:SH.upSm,border:"none",borderRadius:"10px",padding:"0.55rem 0.875rem",fontSize:"0.72rem",fontWeight:active?600:500,color:active?"#0C0A22":C.t3,cursor:"pointer",whiteSpace:"nowrap",transition:"all 0.18s"}}>{label}</button>;
+}
+function Chip({label,active,onClick}){
+  return <button className="nm-pill" onClick={onClick} style={{background:active?C.teal:C.surface,boxShadow:active?SH.teal:SH.upSm,border:"none",borderRadius:"10px",padding:"0.5rem 0.875rem",fontSize:"0.72rem",fontWeight:active?600:500,color:active?"#0C0A22":C.t3,cursor:"pointer",whiteSpace:"nowrap",transition:"all 0.18s"}}>{label}</button>;
+}
+function ActionBtn({children,onClick,variant="default",disabled=false}){
+  const colors={default:{color:C.t3},teal:{color:C.teal},danger:{color:C.pink}};
+  return <button className="nm-btn-sm" onClick={onClick} disabled={disabled} style={{background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.5rem 0.875rem",fontSize:"0.72rem",fontWeight:500,color:colors[variant].color,cursor:disabled?"not-allowed":"pointer",opacity:disabled?0.4:1,fontFamily:"inherit",display:"flex",alignItems:"center",gap:"5px",transition:"all 0.15s"}}>{children}</button>;
+}
+function BtnPink({children,onClick,disabled=false,fullWidth=true}){
+  return <button className="nm-btn-pink" onClick={onClick} disabled={disabled} style={{width:fullWidth?"100%":"auto",background:disabled?"#1D1A38":C.pink,boxShadow:disabled?SH.upSm:SH.pink,border:"none",borderRadius:"16px",padding:"1rem",fontSize:"0.875rem",fontWeight:500,color:disabled?C.t4:"#fff",cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",transition:"all 0.18s"}}>{children}</button>;
+}
+function BtnAmber({children,onClick,disabled=false}){
+  return <button className="nm-btn-amber" onClick={onClick} disabled={disabled} style={{width:"100%",background:C.surface,boxShadow:SH.upSm,border:"1px solid rgba(196,128,58,0.3)",borderRadius:"16px",padding:"1rem",fontSize:"0.875rem",fontWeight:500,color:C.amber,cursor:disabled?"not-allowed":"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",transition:"all 0.18s"}}>{children}</button>;
+}
+function InputField({value,onChange,placeholder,type="text"}){
+  return <input type={type} value={value} onChange={onChange} placeholder={placeholder} style={{width:"100%",background:C.well,boxShadow:SH.down,border:"none",borderRadius:"14px",padding:"0.875rem 1rem",color:C.t1,fontSize:"0.875rem",fontFamily:"inherit",outline:"none",boxSizing:"border-box"}}/>;
+}
+function ProgBar({pct}){
+  const color=pct===100?C.teal:pct>=50?C.amber:C.pink;
+  return <div style={{background:C.well,boxShadow:SH.downSm,borderRadius:"100px",height:"7px",overflow:"hidden"}}>
+    <div style={{height:"100%",borderRadius:"100px",width:pct+"%",background:pct===100?C.teal:C.teal,transition:"width 0.4s ease"}}/>
+  </div>;
+}
+function CheckTick(){
+  return <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3L11.5 4" stroke="#0C0A22" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+}
+function CheckBig(){
+  return <svg width="38" height="38" viewBox="0 0 38 38" fill="none"><path d="M8 19l8 8L30 11" stroke="#0C0A22" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+}
 
-function TaskRow(p){
+function Lightbox({url,onClose}){
+  return <div onClick={onClose} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.94)",zIndex:9999,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"1.5rem"}}>
+    <p style={{fontSize:"0.62rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.teal,marginBottom:"1rem",opacity:0.7}}>Example standard — tap to close</p>
+    <img src={url} alt="Example" style={{maxWidth:"100%",maxHeight:"80vh",borderRadius:"1rem",objectFit:"contain",border:"1px solid #2A2648"}}/>
+  </div>;
+}
+
+function TaskRow({task,idx,isChecked,photoUrl,onToggle,onUpload,uploadingIdx}){
   const fileRef=useRef(null);
-  const isUploading=p.uploadingIdx===p.idx;
-  const needsPhoto=p.task.requiresPhoto;
-  const hasPhoto=!!p.photoUrl;
-  const isFullyDone=p.isChecked&&(!needsPhoto||hasPhoto);
-  function handleChange(e){if(e.target.files&&e.target.files[0])p.onUpload(e.target.files[0],p.idx);}
-  return React.createElement("div",{style:{marginBottom:".5rem"}},
-    React.createElement("button",{style:Object.assign({},st.taskBtn,isFullyDone?st.taskBtnDone:{}),onClick:p.onToggle},
-      React.createElement("div",{style:Object.assign({},st.circle,p.isChecked?st.circleOn:{})},p.isChecked?React.createElement(CheckTick,null):null),
-      React.createElement("span",{style:{fontSize:".875rem",lineHeight:"1.45",flex:"1",textAlign:"left",color:isFullyDone?"#4d6848":"#e8f5e0",textDecoration:isFullyDone?"line-through":"none"}},p.task.text),
-      needsPhoto?React.createElement("span",{style:{fontSize:".7rem",flexShrink:"0",color:hasPhoto?"#6ab84a":"#8b6432"}},"📷"):null
-    ),
-    p.isChecked&&needsPhoto?React.createElement("div",{style:{paddingLeft:"3.5rem",marginTop:".3rem"}},
-      hasPhoto
-        ?React.createElement("span",{style:{fontSize:".75rem",color:"#7ad86a"}},"✓ Photo uploaded")
-        :React.createElement("div",null,
-          React.createElement("button",{style:st.uploadBtn,onClick:function(){if(fileRef.current)fileRef.current.click();},disabled:isUploading},isUploading?"Uploading…":"📷 Add required photo"),
-          React.createElement("input",{ref:fileRef,type:"file",accept:"image/*",capture:"environment",style:{display:"none"},onChange:handleChange})
-        )
-    ):null
-  );
+  const [showExample,setShowExample]=useState(false);
+  const isUploading=uploadingIdx===idx;
+  const needsPhoto=task.requiresPhoto;
+  const hasPhoto=!!photoUrl;
+  const hasExample=needsPhoto&&!!task.examplePhotoUrl;
+  const isDone=isChecked&&(!needsPhoto||hasPhoto);
+  return <div style={{marginBottom:"0.65rem"}}>
+    {showExample&&<Lightbox url={task.examplePhotoUrl} onClose={function(e){e.stopPropagation();setShowExample(false);}}/>}
+    <div className="nm-card" onClick={onToggle} style={{background:isDone?C.bg:C.surface,boxShadow:isDone?"inset 4px 4px 10px rgba(0,0,0,0.52),inset -2px -2px 7px rgba(85,65,185,0.14)":SH.upMd,borderRadius:"16px",padding:"1rem 1.1rem",display:"flex",alignItems:"center",gap:"0.875rem",cursor:"pointer",border:"none",transition:"all 0.22s"}}>
+      <div style={{width:"30px",height:"30px",borderRadius:"50%",flexShrink:0,background:isChecked?C.teal:C.well,boxShadow:isChecked?SH.teal:SH.downSm,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.22s"}}>
+        {isChecked&&<CheckTick/>}
+      </div>
+      <span style={{fontSize:"0.82rem",fontWeight:500,color:isDone?C.t4:C.t2,flex:1,textAlign:"left",lineHeight:1.4,textDecoration:isDone?"line-through":"none",transition:"all 0.22s"}}>{task.text}</span>
+      {needsPhoto&&<span style={{fontSize:"0.62rem",color:hasPhoto?C.teal:C.amber,flexShrink:0,background:hasPhoto?"rgba(13,216,196,0.1)":"rgba(196,128,58,0.1)",borderRadius:"6px",padding:"0.2rem 0.45rem",border:"1px solid "+(hasPhoto?"rgba(13,216,196,0.25)":"rgba(196,128,58,0.25)")}}>📷</span>}
+    </div>
+    {isChecked&&needsPhoto&&<div style={{paddingLeft:"3.75rem",marginTop:"0.4rem",display:"flex",alignItems:"center",gap:"0.75rem",flexWrap:"wrap"}}>
+      {hasPhoto
+        ?<span style={{fontSize:"0.72rem",color:C.teal,display:"flex",alignItems:"center",gap:"4px"}}>
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 4" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Photo uploaded
+          </span>
+        :<div style={{display:"flex",gap:"0.5rem",alignItems:"center",flexWrap:"wrap"}}>
+          <button style={{background:C.surface,boxShadow:SH.upSm,border:"1px solid rgba(196,128,58,0.3)",borderRadius:"10px",padding:"0.4rem 0.875rem",fontSize:"0.72rem",fontWeight:500,color:C.amber,cursor:"pointer",fontFamily:"inherit",display:"flex",alignItems:"center",gap:"5px"}} onClick={function(){if(fileRef.current)fileRef.current.click();}} disabled={isUploading}>
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1.5" stroke={C.amber} strokeWidth="1.25"/><circle cx="8" cy="9" r="2" stroke={C.amber} strokeWidth="1.25"/><path d="M6 5l1-2h2l1 2" stroke={C.amber} strokeWidth="1.25" strokeLinejoin="round"/></svg>
+            {isUploading?"Uploading…":"Add required photo"}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{display:"none"}} onChange={function(e){if(e.target.files&&e.target.files[0])onUpload(e.target.files[0],idx);}}/>
+        </div>
+      }
+      {hasExample&&<button style={{background:"none",border:"1px solid rgba(13,216,196,0.2)",borderRadius:"8px",padding:"0.25rem 0.625rem",fontSize:"0.7rem",color:C.teal,cursor:"pointer",flexShrink:0}} onClick={function(e){e.stopPropagation();setShowExample(true);}}>See example →</button>}
+    </div>}
+  </div>;
 }
 
-function EditTaskRow(p){
-  return React.createElement("div",{style:st.editRow},
-    React.createElement("input",{style:st.editInput,value:p.task.text,onChange:function(e){p.onUpdateText(p.idx,e.target.value);}}),
-    React.createElement("button",{style:Object.assign({},st.photoToggle,p.task.requiresPhoto?st.photoToggleOn:{}),onClick:function(){p.onTogglePhoto(p.idx);}},  "📷"),
-    React.createElement("button",{style:st.rmBtn,onClick:function(){p.onRemove(p.idx);}},"×")
-  );
+function EditTaskRow({task,idx,onUpdateText,onTogglePhoto,onSetExample,onRemove}){
+  const exFileRef=useRef(null);
+  const [exUploading,setExUploading]=useState(false);
+  const hasExample=!!task.examplePhotoUrl;
+  async function handleExampleUpload(file){
+    setExUploading(true);
+    try{
+      const ext=file.name.split(".").pop()||"jpg";
+      const path="examples/"+Date.now()+"_"+idx+"."+ext;
+      const url=await uploadPhoto(file,path);
+      onSetExample(idx,url);
+    }catch(e){alert("Upload failed. Try again.");}
+    setExUploading(false);
+  }
+  return <div style={{background:C.surface,boxShadow:SH.upMd,borderRadius:"14px",padding:"0.75rem",marginBottom:"0.625rem"}}>
+    <div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+      <input value={task.text} onChange={function(e){onUpdateText(idx,e.target.value);}} style={{flex:1,background:C.well,boxShadow:SH.downSm,border:"none",borderRadius:"10px",padding:"0.6rem 0.75rem",color:C.t1,fontSize:"0.8rem",fontFamily:"inherit",outline:"none",minWidth:0}}/>
+      <button onClick={function(){onTogglePhoto(idx);}} style={{background:task.requiresPhoto?"rgba(196,128,58,0.15)":C.surface,boxShadow:task.requiresPhoto?"inset 2px 2px 5px rgba(0,0,0,0.45),inset -1px -1px 4px rgba(85,65,185,0.12)":SH.upSm,border:task.requiresPhoto?"1px solid rgba(196,128,58,0.3)":"none",borderRadius:"8px",padding:"0.5rem",cursor:"pointer",flexShrink:0,transition:"all 0.18s"}}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1.5" stroke={task.requiresPhoto?C.amber:"#4A4468"} strokeWidth="1.25"/><circle cx="8" cy="9" r="2" stroke={task.requiresPhoto?C.amber:"#4A4468"} strokeWidth="1.25"/><path d="M6 5l1-2h2l1 2" stroke={task.requiresPhoto?C.amber:"#4A4468"} strokeWidth="1.25" strokeLinejoin="round"/></svg>
+      </button>
+      <button onClick={function(){onRemove(idx);}} style={{background:"none",border:"none",color:C.t4,fontSize:"1.1rem",cursor:"pointer",padding:"0.5rem",borderRadius:"8px",flexShrink:0,lineHeight:1,transition:"color 0.15s"}}>×</button>
+    </div>
+    {task.requiresPhoto&&<div style={{display:"flex",alignItems:"center",gap:"0.5rem",marginTop:"0.5rem",paddingTop:"0.5rem",borderTop:"1px solid rgba(255,255,255,0.04)"}}>
+      {hasExample
+        ?<div style={{display:"flex",alignItems:"center",gap:"0.5rem"}}>
+          <span style={{fontSize:"0.65rem",color:C.teal,display:"flex",alignItems:"center",gap:"4px"}}>
+            <svg width="10" height="10" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 4" stroke={C.teal} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            Example set
+          </span>
+          <button onClick={function(){onSetExample(idx,null);}} style={{background:"none",border:"none",fontSize:"0.63rem",color:C.t4,cursor:"pointer",textDecoration:"underline",fontFamily:"inherit"}}>Remove</button>
+        </div>
+        :<label style={{fontSize:"0.65rem",color:exUploading?C.t4:C.amber,cursor:"pointer",border:"1px dashed rgba(196,128,58,0.3)",borderRadius:"8px",padding:"0.3rem 0.625rem",transition:"all 0.15s"}}>
+          {exUploading?"Uploading…":"+ Add example photo"}
+          <input type="file" accept="image/*" style={{display:"none"}} disabled={exUploading} onChange={function(e){if(e.target.files&&e.target.files[0])handleExampleUpload(e.target.files[0]);}}/>
+        </label>
+      }
+    </div>}
+  </div>;
 }
 
-function ResultsView(p){
+function ResultsView({logs,logsLoading,logsErr,onRefresh}){
   const [filterLoc,setFilterLoc]=useState("All");
   const [filterShift,setFilterShift]=useState("All");
-  const [filterDate,setFilterDate]=useState("All");
+  const [filterDate,setFilterDate]=useState("Last 7 days");
   const dateOpts=["All","Today","Last 7 days","Last 30 days"];
   function withinDate(log){
     if(filterDate==="All") return true;
@@ -254,53 +372,83 @@ function ResultsView(p){
     if(filterDate==="Last 30 days") return (now-d)<30*86400000;
     return true;
   }
-  const filtered=p.logs.filter(function(l){return(filterLoc==="All"||l.location===filterLoc)&&(filterShift==="All"||l.shift===filterShift)&&withinDate(l);});
+  const filtered=logs.filter(function(l){return(filterLoc==="All"||l.location===filterLoc)&&(filterShift==="All"||l.shift===filterShift)&&withinDate(l);});
   const total=filtered.length;
   const fullyComplete=filtered.filter(function(l){return l.completed===l.total;}).length;
   const incomplete=total-fullyComplete;
   const compRate=total?Math.round(fullyComplete/total*100):0;
   const bySec={};
-  filtered.forEach(function(l){const k=l.location+" · "+l.section;if(!bySec[k])bySec[k]={done:0,total:0};bySec[k].total++;if(l.completed===l.total)bySec[k].done++;});
+  filtered.forEach(function(l){const k=l.location+" \u00b7 "+l.section;if(!bySec[k])bySec[k]={done:0,total:0};bySec[k].total++;if(l.completed===l.total)bySec[k].done++;});
   const missedTasks={};
   filtered.forEach(function(l){(l.tasks||[]).forEach(function(t){if(!t.done)missedTasks[t.task]=(missedTasks[t.task]||0)+1;});});
   const topMissed=Object.entries(missedTasks).sort(function(a,b){return b[1]-a[1];}).slice(0,5);
-  if(p.logsLoading) return React.createElement("p",{style:{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}},"Loading…");
-  if(p.logsErr) return React.createElement("p",{style:{fontSize:".875rem",color:"#e07858",textAlign:"center",padding:"3rem 0"}},"Failed to load.");
-  return React.createElement("div",null,
-    React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}},
-      React.createElement("button",{style:st.btnG,onClick:p.onRefresh},"↺ Refresh"),
-      React.createElement("select",{style:st.fieldSm,value:filterLoc,onChange:function(e){setFilterLoc(e.target.value);}},React.createElement("option",null,"All"),LOCS.map(function(l){return React.createElement("option",{key:l},l);})),
-      React.createElement("select",{style:st.fieldSm,value:filterShift,onChange:function(e){setFilterShift(e.target.value);}},React.createElement("option",null,"All"),SHIFTS.map(function(s){return React.createElement("option",{key:s},s);})),
-      React.createElement("select",{style:st.fieldSm,value:filterDate,onChange:function(e){setFilterDate(e.target.value);}},dateOpts.map(function(d){return React.createElement("option",{key:d},d);}))
-    ),
-    total===0
-      ?React.createElement("p",{style:{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}},"No submissions match the selected filters.")
-      :React.createElement("div",null,
-        React.createElement("div",{style:{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap"}},
-          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#ffffff"}},total),React.createElement("p",{style:{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Submissions")),
-          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:"#7ad86a"}},compRate+"%"),React.createElement("p",{style:{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Completion rate")),
-          React.createElement("div",{style:st.statBox},React.createElement("p",{style:{fontSize:"1.75rem",fontWeight:"700",color:incomplete>0?"#d4a860":"#7ad86a"}},incomplete),React.createElement("p",{style:{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem",textTransform:"uppercase",letterSpacing:".08em"}},"Incomplete"))
-        ),
-        React.createElement("span",{style:st.sectionLbl},"Completion by Section"),
-        React.createElement("div",{style:{marginBottom:"1.5rem"}},
-          Object.entries(bySec).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(entry){
-            const k=entry[0],v=entry[1],pct=Math.round(v.done/v.total*100),bc=pct===100?"#7ad86a":pct>=50?"#d4a860":"#e07858";
-            return React.createElement("div",{key:k,style:{marginBottom:".75rem"}},
-              React.createElement("div",{style:{display:"flex",justifyContent:"space-between",fontSize:".8rem",marginBottom:".3rem"}},React.createElement("span",{style:{color:"#e0eed0"}},k),React.createElement("span",{style:{color:bc}},v.done+"/"+v.total+" · "+pct+"%")),
-              React.createElement("div",{style:{height:"4px",background:"rgba(10,20,8,0.5)",borderRadius:"2px",overflow:"hidden"}},React.createElement("div",{style:{height:"100%",borderRadius:"2px",width:pct+"%",background:bc,transition:"width .4s"}}))
-            );
-          })
-        ),
-        topMissed.length>0?React.createElement("div",null,
-          React.createElement("span",{style:st.sectionLbl},"Most Missed Tasks"),
-          React.createElement("div",{style:{background:"rgba(10,20,8,0.45)",border:"1px solid #3a5a2a",borderRadius:".875rem",overflow:"hidden"}},
-            topMissed.map(function(entry,i){return React.createElement("div",{key:i,style:{display:"flex",alignItems:"center",justifyContent:"space-between",padding:".75rem 1rem",borderBottom:i<topMissed.length-1?"1px solid rgba(58,90,42,0.4)":"none"}},React.createElement("span",{style:{fontSize:".8rem",color:"#e0eed0",flex:"1",marginRight:"1rem"}},entry[0]),React.createElement("span",{style:{fontSize:".75rem",fontWeight:"600",color:"#d4a860",flexShrink:"0"}},entry[1]+"x missed"));})
-          )
-        ):null
-      )
-  );
+  const filterStyle={background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.45rem 0.75rem",fontSize:"0.7rem",fontWeight:500,color:C.t3,cursor:"pointer",fontFamily:"inherit",transition:"all 0.18s"};
+  const filterActiveStyle=Object.assign({},filterStyle,{background:C.teal,color:"#0C0A22",fontWeight:600,boxShadow:SH.teal});
+  if(logsLoading) return <p style={{textAlign:"center",padding:"3rem 0",color:C.t4,fontSize:"0.875rem"}}>Loading…</p>;
+  if(logsErr) return <p style={{textAlign:"center",padding:"3rem 0",color:C.pink,fontSize:"0.875rem"}}>Failed to load.</p>;
+  return <div>
+    <div style={{display:"flex",gap:"0.5rem",marginBottom:"1.5rem",flexWrap:"wrap",alignItems:"center"}}>
+      <ActionBtn onClick={onRefresh} variant="teal">
+        <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 1 0 1.5-3.5" stroke={C.teal} strokeWidth="1.5" strokeLinecap="round"/><path d="M3 4.5V8h3.5" stroke={C.teal} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        Refresh
+      </ActionBtn>
+      <select value={filterLoc} onChange={function(e){setFilterLoc(e.target.value);}} style={{background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.45rem 0.75rem",fontSize:"0.7rem",color:C.t3,fontFamily:"inherit",outline:"none"}}>
+        <option>All</option>{LOCS.map(function(l){return <option key={l}>{l}</option>;})}
+      </select>
+      <select value={filterShift} onChange={function(e){setFilterShift(e.target.value);}} style={{background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.45rem 0.75rem",fontSize:"0.7rem",color:C.t3,fontFamily:"inherit",outline:"none"}}>
+        <option>All</option>{SHIFTS.map(function(s){return <option key={s}>{s}</option>;})}
+      </select>
+      <select value={filterDate} onChange={function(e){setFilterDate(e.target.value);}} style={{background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.45rem 0.75rem",fontSize:"0.7rem",color:C.t3,fontFamily:"inherit",outline:"none"}}>
+        {dateOpts.map(function(d){return <option key={d}>{d}</option>;})}
+      </select>
+    </div>
+    {total===0
+      ?<p style={{textAlign:"center",padding:"3rem 0",color:C.t4,fontSize:"0.875rem"}}>No submissions match filters.</p>
+      :<div>
+        <div style={{display:"flex",gap:"0.625rem",marginBottom:"1.75rem"}}>
+          {[{v:total,l:"Submissions",c:C.t1},{v:compRate+"%",l:"Completion",c:C.teal},{v:incomplete,l:"Incomplete",c:incomplete>0?C.amber:C.teal}].map(function(s,i){
+            return <div key={i} style={{flex:1,background:C.surface,borderRadius:"16px",boxShadow:SH.upMd,padding:"1rem 0.875rem",textAlign:"center"}}>
+              <div style={{fontSize:"1.75rem",fontWeight:700,color:s.c,letterSpacing:"-0.03em",lineHeight:1}}>{s.v}</div>
+              <div style={{fontSize:"0.6rem",letterSpacing:"0.1em",textTransform:"uppercase",color:C.t4,marginTop:"0.4rem"}}>{s.l}</div>
+            </div>;
+          })}
+        </div>
+        <SecLbl>Completion by section</SecLbl>
+        <div style={{marginBottom:"1.5rem"}}>
+          {Object.entries(bySec).sort(function(a,b){return a[0].localeCompare(b[0]);}).map(function(entry){
+            const k=entry[0],v=entry[1],pct=Math.round(v.done/v.total*100);
+            const bc=pct===100?C.teal:pct>=50?C.amber:C.pink;
+            return <div key={k} style={{marginBottom:"0.75rem"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.35rem"}}>
+                <span style={{fontSize:"0.78rem",color:C.t2}}>{k}</span>
+                <span style={{fontSize:"0.72rem",fontWeight:600,color:bc}}>{pct}%</span>
+              </div>
+              <div style={{background:C.well,boxShadow:SH.downSm,borderRadius:"100px",height:"6px",overflow:"hidden"}}>
+                <div style={{height:"100%",borderRadius:"100px",width:pct+"%",background:bc,transition:"width 0.4s"}}/>
+              </div>
+            </div>;
+          })}
+        </div>
+        {topMissed.length>0&&<div>
+          <SecLbl>Most missed tasks</SecLbl>
+          {topMissed.map(function(entry,i){
+            const rankColors=[C.pink,C.amber,C.t3,C.t4,C.t4];
+            const rc=rankColors[i]||C.t4;
+            return <div key={i} style={{background:C.surface,boxShadow:SH.upSm,borderRadius:"12px",padding:"0.75rem 1rem",marginBottom:"0.5rem",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                <div style={{width:"22px",height:"22px",borderRadius:"6px",background:"rgba("+( i===0?"232,41,122":i===1?"196,128,58":"122,114,160")+",0.12)",border:"1px solid rgba("+(i===0?"232,41,122":i===1?"196,128,58":"122,114,160")+",0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,fontSize:"0.65rem",fontWeight:700,color:rc}}>{i+1}</div>
+                <span style={{fontSize:"0.75rem",color:C.t2}}>{entry[0]}</span>
+              </div>
+              <span style={{fontSize:"0.68rem",fontWeight:600,color:rc,flexShrink:0,marginLeft:"0.5rem"}}>{entry[1]}× missed</span>
+            </div>;
+          })}
+        </div>}
+      </div>
+    }
+  </div>;
 }
 
+// ── App ───────────────────────────────────────────────────────────────────────
 function App(){
   const [view,setView]=useState("loading");
   const [name,setName]=useState("");
@@ -329,7 +477,6 @@ function App(){
   const [eSec,setESec]=useState("Grill");
   const [eShift,setEShift]=useState("Opening");
   const [expanded,setExpanded]=useState(null);
-  // Issue log state
   const [issueName,setIssueName]=useState("");
   const [issueItem,setIssueItem]=useState("");
   const [issuePhoto,setIssuePhoto]=useState(null);
@@ -337,20 +484,18 @@ function App(){
   const [issueUploading,setIssueUploading]=useState(false);
   const [issueSubmitting,setIssueSubmitting]=useState(false);
   const [issueErr,setIssueErr]=useState("");
-  // Admin issue log state
   const [issues,setIssues]=useState([]);
   const [issuesLoading,setIssuesLoading]=useState(false);
   const [issuesErr,setIssuesErr]=useState(false);
   const [issueFilterDate,setIssueFilterDate]=useState("All");
   const [issueFilterName,setIssueFilterName]=useState("");
+  const [newSecName,setNewSecName]=useState("");
 
   useEffect(function(){
     sbFetchConfig().then(function(config){setCls(config||deepClone(DT));setView("welcome");}).catch(function(){setCls(deepClone(DT));setView("welcome");});
   },[]);
 
-  // Save config to Supabase and update local state
   const saveCls=function(u){setCls(u);setConfigSaving(true);sbSaveConfig(u).finally(function(){setConfigSaving(false);});};
-  // Fetch logs — called on admin tab load and manual refresh
   const fetchLogs=useCallback(async function(){
     setLogsLoading(true);setLogsErr(false);
     try{setLogs(await sbFetchLogs());}catch(e){setLogsErr(true);}
@@ -384,7 +529,6 @@ function App(){
     }catch(e){setIssueErr("Submission failed. Check connection.");}
     setIssueSubmitting(false);
   };
-
   const handleDeleteSelected=async function(){
     if(!selectedIds.length) return;
     if(!window.confirm("Delete "+selectedIds.length+" selected submission"+(selectedIds.length!==1?"s":"")+"? This cannot be undone.")) return;
@@ -405,23 +549,15 @@ function App(){
     }catch(e){alert("Delete failed. Please try again.");}
     setDeleting(false);
   };
-  const toggleSelect=function(id){
-    setSelectedIds(function(prev){
-      return prev.indexOf(id)>=0?prev.filter(function(x){return x!==id;}):[].concat(prev,[id]);
-    });
-  };
-  const toggleSelectAll=function(){
-    setSelectedIds(function(prev){return prev.length===logs.length?[]:[].concat(logs.map(function(l){return l.id;}));});
-  };
+  const toggleSelect=function(id){setSelectedIds(function(prev){return prev.indexOf(id)>=0?prev.filter(function(x){return x!==id;}):[].concat(prev,[id]);});};
+  const toggleSelectAll=function(){setSelectedIds(function(prev){return prev.length===logs.length?[]:[].concat(logs.map(function(l){return l.id;}));});};
   const exitSelectMode=function(){setSelectMode(false);setSelectedIds([]);};
 
   const taskDone=function(i){return checked[i]&&(!tasks[i]||!tasks[i].requiresPhoto||!!photos[i]);};
   const completed=tasks.filter(function(_,i){return taskDone(i);}).length;
   const pct=tasks.length?Math.round(completed/tasks.length*100):0;
   const allDone=tasks.length>0&&completed===tasks.length;
-  const unticked=tasks.filter(function(_,i){return !checked[i];}).length;
-  const photoNeeded=tasks.filter(function(t,i){return t.requiresPhoto&&checked[i]&&!photos[i];}).length;
-  const btnLabel=allDone?"Submit Checklist ✓":unticked>0?unticked+" task"+(unticked!==1?"s":"")+" remaining":photoNeeded+" photo"+(photoNeeded!==1?"s":"")+" required";
+  const incomplete=tasks.length-completed;
 
   const resetHome=function(){setLoc("");setSec("");setShift("");setName("");setSubmitErr(false);setPhotoErr(false);setView("welcome");};
   const startChecklist=function(){
@@ -457,6 +593,7 @@ function App(){
   const toggleTaskPhoto=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh][i]=Object.assign({},u[l][sc][sh][i],{requiresPhoto:!u[l][sc][sh][i].requiresPhoto});saveCls(u);};
   const removeTask=function(l,sc,sh,i){const u=deepClone(cls);u[l][sc][sh].splice(i,1);saveCls(u);};
   const addTask=function(l,sc,sh){const u=deepClone(cls);u[l][sc][sh].push({text:"New task",requiresPhoto:false});saveCls(u);};
+  const setTaskExamplePhoto=function(l,sc,sh,i,url){const u=deepClone(cls);u[l][sc][sh][i]=Object.assign({},u[l][sc][sh][i],{examplePhotoUrl:url||null});saveCls(u);};
   const toggleShiftEnabled=function(l,sc,sh){
     const u=deepClone(cls);
     if(!u[l][sc]._enabled) u[l][sc]._enabled=deepClone(DEFAULT_ENABLED);
@@ -472,17 +609,15 @@ function App(){
     if(!cls||!cls[l]) return STRUCTURE[l]||[];
     return cls[l]._sections||STRUCTURE[l]||[];
   };
-  const addSection=function(l,name){
-    const trimmed=name.trim();
-    if(!trimmed) return;
+  const addSection=function(l,n){
+    const trimmed=n.trim();if(!trimmed) return;
     const u=deepClone(cls);
     if(!u[l]._sections) u[l]._sections=deepClone(STRUCTURE[l]);
     if(u[l]._sections.indexOf(trimmed)>=0) return;
     u[l]._sections.push(trimmed);
     u[l][trimmed]={_enabled:deepClone(DEFAULT_ENABLED)};
     SHIFTS.forEach(function(sh){u[l][trimmed][sh]=[];});
-    saveCls(u);
-    setESec(trimmed);
+    saveCls(u);setESec(trimmed);
   };
   const removeSection=function(l,sc){
     if(!window.confirm("Remove section '"+sc+"' and all its tasks? This cannot be undone.")) return;
@@ -493,332 +628,457 @@ function App(){
     const remaining=u[l]._sections;
     setESec(remaining.length>0?remaining[0]:"");
   };
-  const [newSecName,setNewSecName]=useState("");
   const eSections=getSections(eLoc);
   const eTasks=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec][eShift]?cls[eLoc][eSec][eShift]:[];
   const eEnabled=cls&&cls[eLoc]&&cls[eLoc][eSec]&&cls[eLoc][eSec]._enabled?cls[eLoc][eSec]._enabled:deepClone(DEFAULT_ENABLED);
 
-  if(view==="loading") return React.createElement("div",{style:Object.assign({},st.page,st.center)},React.createElement("p",{style:{fontSize:".75rem",color:"#b8c8a8",letterSpacing:".1em",textTransform:"uppercase"}},"Loading…"));
+  // ── Views ──────────────────────────────────────────────────────────────────
+  if(view==="loading") return (
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <p style={{fontSize:"0.72rem",color:C.t4,letterSpacing:"0.14em",textTransform:"uppercase"}}>Loading…</p>
+    </div>
+  );
 
   if(view==="welcome") return (
-    <div style={{minHeight:"100vh",background:"transparent",color:"#f0ede8",fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem",position:"relative",overflow:"hidden"}}>
-      <div style={{position:"absolute",top:"-10%",left:"50%",transform:"translateX(-50%)",width:"600px",height:"600px",background:"radial-gradient(ellipse at center, rgba(80,130,60,0.1) 0%, transparent 70%)",pointerEvents:"none"}}/>
-      <div style={{position:"absolute",inset:0,backgroundImage:"radial-gradient(circle, #2a3e20 1px, transparent 1px)",backgroundSize:"28px 28px",opacity:"0.4",pointerEvents:"none"}}/>
-      <div style={{position:"relative",width:"100%",maxWidth:"360px",textAlign:"center"}}>
-        <p style={{fontSize:"1.1rem",letterSpacing:".25em",textTransform:"uppercase",color:"#f0ede8",fontWeight:"700",marginBottom:"1rem"}}>Mise</p>
-        <h1 style={{fontSize:"2rem",fontWeight:"700",lineHeight:"1.2",marginBottom:".5rem",color:"#ffffff"}}>Welcome to Mise</h1>
-        <p style={{fontSize:".95rem",color:"#c8d8b8",marginBottom:"3rem",fontStyle:"italic"}}>your hospo friend</p>
-        <p style={{fontSize:".65rem",letterSpacing:".15em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:"1rem"}}>Please select your task</p>
-        <div style={{display:"flex",flexDirection:"column",gap:".75rem"}}>
-          <button onClick={function(){setView("home");}} style={{width:"100%",background:"rgba(10,20,8,0.5)",border:"1px solid #5a8050",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-            onMouseEnter={function(e){e.currentTarget.style.borderColor="#9ac880";}}
-            onMouseLeave={function(e){e.currentTarget.style.borderColor="#5a8050";}}>
-            <div>
-              <p style={{fontSize:".95rem",fontWeight:"600",color:"#ffffff",marginBottom:".2rem"}}>Daily Checklists</p>
-              <p style={{fontSize:".75rem",color:"#c8d8b8"}}>Opening, closing & shift tasks</p>
-            </div>
-            <span style={{fontSize:"1.2rem",color:"#c8d8b8"}}>→</span>
-          </button>
-          {[
-            {title:"Staff Equipment Training",desc:"Track equipment sign-offs & competencies",soon:true},
-          ].map(function(item){
-            return React.createElement("div",{key:item.title,style:{width:"100%",background:"rgba(10,20,8,0.3)",border:"1px solid rgba(90,128,80,0.35)",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",display:"flex",alignItems:"center",justifyContent:"space-between",opacity:"0.65"}},
-              React.createElement("div",null,
-                React.createElement("p",{style:{fontSize:".95rem",fontWeight:"600",color:"#d8e8c8",marginBottom:".2rem"}},item.title),
-                React.createElement("p",{style:{fontSize:".75rem",color:"#b8c8a8"}},item.desc)
-              ),
-              React.createElement("span",{style:{fontSize:".65rem",letterSpacing:".1em",textTransform:"uppercase",color:"#b8c8a8",border:"1px solid rgba(90,128,80,0.5)",borderRadius:".375rem",padding:".25rem .5rem"}},"Soon")
-            );
-          })}
-          <button onClick={function(){resetIssueForm();setView("issueLog");}} style={{width:"100%",background:"rgba(10,20,8,0.5)",border:"1px solid #5a8050",borderRadius:"1rem",padding:"1.25rem 1.5rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}
-            onMouseEnter={function(e){e.currentTarget.style.borderColor="#9ac880";}}
-            onMouseLeave={function(e){e.currentTarget.style.borderColor="#5a8050";}}>
-            <div>
-              <p style={{fontSize:".95rem",fontWeight:"600",color:"#ffffff",marginBottom:".2rem"}}>Maintenance & Equipment Logs</p>
-              <p style={{fontSize:".75rem",color:"#c8d8b8"}}>Log equipment issues & repairs</p>
-            </div>
-            <span style={{fontSize:"1.2rem",color:"#c8d8b8"}}>→</span>
-          </button>
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"2rem 1.25rem"}}>
+      <div style={{background:C.bg,borderRadius:"2.25rem",boxShadow:SH.frame,padding:"2.5rem 1.5rem 2rem",width:"100%",maxWidth:"360px",position:"relative"}}>
+        <div style={{position:"absolute",top:0,left:"50%",transform:"translateX(-50%)",width:"52px",height:"3px",background:C.pink,borderRadius:"0 0 4px 4px"}}/>
+        <div style={{marginBottom:"2rem"}}>
+          <div style={{fontFamily:"Georgia,'Book Antiqua',Palatino,serif",fontStyle:"italic",fontSize:"3rem",color:C.t1,letterSpacing:"-0.03em",lineHeight:1,marginBottom:"0.5rem",display:"flex",alignItems:"flex-end",gap:"0.5rem"}}>
+            mise
+            <div style={{width:"7px",height:"7px",background:C.pink,borderRadius:"1px",transform:"rotate(45deg)",marginBottom:"0.55rem",flexShrink:0,boxShadow:"2px 2px 5px rgba(185,15,75,0.5)"}}/>
+          </div>
+          <div style={{fontSize:"0.62rem",letterSpacing:"0.18em",textTransform:"uppercase",color:C.pink,opacity:0.65}}>Everything in its place.</div>
         </div>
-        <button style={{marginTop:"2.5rem",fontSize:".7rem",color:"rgba(200,220,180,0.2)",background:"none",border:"none",cursor:"pointer",width:"100%",textAlign:"center"}} onClick={function(){setView("adminLogin");}}>Admin</button>
+        <div style={{height:"1px",background:"#201D3C",marginBottom:"1.25rem"}}/>
+        <div style={{fontSize:"0.6rem",letterSpacing:"0.16em",textTransform:"uppercase",color:C.t4,marginBottom:"0.875rem"}}>Select your task</div>
+        <div style={{display:"flex",flexDirection:"column",gap:"0.75rem"}}>
+          {[
+            {title:"Daily Checklists",desc:"Opening, closing & shift tasks",icon:<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M3 8.5l3 3L13 5" stroke={C.pink} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/></svg>,action:function(){setView("home");}},
+            {title:"Maintenance Logs",desc:"Log equipment issues & repairs",icon:<svg width="17" height="17" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke={C.pink} strokeWidth="1.75"/><path d="M8 2.5v1.5M8 12v1.5M2.5 8H4M12 8h1.5" stroke={C.pink} strokeWidth="1.5" strokeLinecap="round"/></svg>,action:function(){resetIssueForm();setView("issueLog");}}
+          ].map(function(item){
+            return <button key={item.title} className="nm-card" onClick={item.action} style={{background:C.surface,boxShadow:SH.upMd,border:"none",borderRadius:"1rem",padding:"1.1rem 1.2rem",textAlign:"left",cursor:"pointer",display:"flex",alignItems:"center",gap:"0.875rem",transition:"all 0.18s",width:"100%"}}>
+              <div style={{width:"40px",height:"40px",borderRadius:"10px",background:"rgba(232,41,122,0.1)",boxShadow:"3px 3px 8px rgba(0,0,0,0.5),-2px -2px 6px rgba(85,65,185,0.15)",border:"1px solid rgba(232,41,122,0.18)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                {item.icon}
+              </div>
+              <div style={{flex:1,textAlign:"left"}}>
+                <p style={{fontSize:"0.9rem",fontWeight:600,color:C.t1,marginBottom:"0.15rem"}}>{item.title}</p>
+                <p style={{fontSize:"0.72rem",color:C.t3}}>{item.desc}</p>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{flexShrink:0,opacity:0.4}}><path d="M6 4l4 4-4 4" stroke={C.pink} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>;
+          })}
+          <div style={{background:"rgba(29,26,56,0.6)",boxShadow:SH.upSm,borderRadius:"1rem",padding:"1.1rem 1.2rem",display:"flex",alignItems:"center",gap:"0.875rem",opacity:0.45}}>
+            <div style={{width:"40px",height:"40px",borderRadius:"10px",background:"rgba(255,255,255,0.03)",boxShadow:SH.downSm,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+              <svg width="17" height="17" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="1.5" stroke="#3A3860" strokeWidth="1.5"/><path d="M5 7h6M5 9.5h4" stroke="#3A3860" strokeWidth="1.5" strokeLinecap="round"/></svg>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:"0.9rem",fontWeight:600,color:"#6A6288",marginBottom:"0.15rem"}}>Staff Training</p>
+              <p style={{fontSize:"0.72rem",color:"#3A3658"}}>Equipment sign-offs & competencies</p>
+            </div>
+            <div style={{fontSize:"0.58rem",letterSpacing:"0.1em",textTransform:"uppercase",color:C.t4,background:C.well,boxShadow:SH.downSm,borderRadius:"100px",padding:"0.25rem 0.65rem"}}>Soon</div>
+          </div>
+        </div>
+        <div style={{marginTop:"2rem",textAlign:"center",borderTop:"1px solid rgba(255,255,255,0.04)",paddingTop:"1.25rem"}}>
+          <button style={{background:"none",border:"none",fontSize:"0.6rem",letterSpacing:"0.1em",textTransform:"uppercase",color:"#252240",cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setView("adminLogin");}}>Admin</button>
+        </div>
       </div>
     </div>
   );
 
   if(view==="home") return (
-    <div style={Object.assign({},st.page,st.center)}>
-      <div style={st.card}>
-        <button style={st.backBtn} onClick={function(){setView("welcome");}}>← Back</button>
-        <p style={st.eyebrow}>Mise</p>
-        <h1 style={st.heading}>Section Checklists</h1>
-        <div style={st.stack}>
-          <div><label style={st.lbl}>Your Name</label><input style={st.field} placeholder="Enter your name" value={name} onChange={function(e){setName(e.target.value);}}/></div>
-          <div><label style={st.lbl}>Location</label><div style={st.grid2}>{LOCS.map(function(l){return <Pill key={l} label={l} active={loc===l} onClick={function(){setLoc(l);setSec("");}}/>; })}</div></div>
-          {loc?<div><label style={st.lbl}>Section</label><div style={st.grid2}>{getSections(loc).map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);setShift("");}}/>; })}</div></div>:null}
-          {sec?<div><label style={st.lbl}>Shift</label><div style={st.grid2}>{getEnabledShifts(loc,sec).map(function(sh){return <Pill key={sh} label={sh} active={shift===sh} onClick={function(){setShift(sh);}}/>; })}</div></div>:null}
-          <button style={Object.assign({},st.btnP,{opacity:(!name.trim()||!loc||!sec||!shift)?0.25:1})} disabled={!name.trim()||!loc||!sec||!shift} onClick={startChecklist}>Start Checklist →</button>
-        </div>
-        <button style={st.adminLink} onClick={function(){setView("adminLogin");}}>Admin</button>
+    <Frame>
+      <NavBar onBack={function(){setView("welcome");}}/>
+      <div style={{marginBottom:"1.75rem"}}>
+        <div style={{fontSize:"1.15rem",fontWeight:600,color:C.t1,marginBottom:"0.2rem"}}>Section Checklists</div>
+        <div style={{fontSize:"0.72rem",color:C.t4}}>Fill in your details to begin</div>
       </div>
-    </div>
+      <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+        <div>
+          <Lbl>Your name</Lbl>
+          <InputField value={name} onChange={function(e){setName(e.target.value);}} placeholder="Enter your name"/>
+        </div>
+        <div>
+          <Lbl>Location</Lbl>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.6rem"}}>
+            {LOCS.map(function(l){return <Pill key={l} label={l} active={loc===l} onClick={function(){setLoc(l);setSec("");setShift("");}}/>;  })}
+          </div>
+        </div>
+        {loc&&<div>
+          <Lbl>Section</Lbl>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"0.6rem"}}>
+            {getSections(loc).map(function(sc){return <Pill key={sc} label={sc} active={sec===sc} onClick={function(){setSec(sc);setShift("");}}/>;  })}
+          </div>
+        </div>}
+        {sec&&<div>
+          <Lbl>Shift</Lbl>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"0.5rem"}}>
+            {getEnabledShifts(loc,sec).map(function(sh){return <Pill key={sh} label={sh} active={shift===sh} onClick={function(){setShift(sh);}}/>;  })}
+          </div>
+        </div>}
+        <BtnPink onClick={startChecklist} disabled={!name.trim()||!loc||!sec||!shift}>
+          {!name.trim()||!loc||!sec||!shift?"Fill in all fields to continue":"Start Checklist"}
+          {name.trim()&&loc&&sec&&shift&&<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M9 5l3 3-3 3" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+        </BtnPink>
+      </div>
+    </Frame>
   );
 
   if(view==="checklist") return (
-    <div style={Object.assign({},st.page,st.col)}>
-      <div style={st.inner}>
-        <button style={st.backBtn} onClick={resetHome}>← Back</button>
-        <p style={{fontSize:".7rem",letterSpacing:".1em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".3rem"}}>{name} · {loc} · {sec}</p>
-        <h2 style={{fontSize:"1.3rem",fontWeight:"600",marginBottom:"1.25rem",color:"#f0f8e8"}}>{shift} Checklist</h2>
-        <div style={st.pctRow}><span>{completed} of {tasks.length} complete</span><span>{pct}%</span></div>
-        <div style={st.pbar}><div style={{height:"100%",background:"#c8ddb8",borderRadius:"2px",width:pct+"%",transition:"width .4s"}}/></div>
-        <div style={st.tasksWrap}>
-          {tasks.map(function(task,i){return <TaskRow key={i} task={task} idx={i} isChecked={checked[i]} photoUrl={photos[i]} onToggle={function(){toggle(i);}} onUpload={handlePhotoUpload} uploadingIdx={uploadingIdx}/>; })}
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",padding:"2rem 1.5rem"}}>
+      <div style={{maxWidth:"360px",width:"100%",margin:"0 auto",flex:1,display:"flex",flexDirection:"column"}}>
+        <NavBar onBack={resetHome}/>
+        <div style={{marginBottom:"1.5rem"}}>
+          <div style={{fontSize:"0.65rem",letterSpacing:"0.1em",textTransform:"uppercase",color:C.t4,marginBottom:"0.3rem"}}>{name} \u00b7 {loc} \u00b7 {sec}</div>
+          <div style={{fontSize:"1.2rem",fontWeight:600,color:C.t1}}>{shift} Checklist</div>
         </div>
-        {photoErr?<p style={{fontSize:".75rem",color:"#c0604a",marginBottom:".5rem",textAlign:"center"}}>Photo upload failed — check connection and try again.</p>:null}
-        {submitErr?<p style={{fontSize:".75rem",color:"#c0604a",marginBottom:".5rem",textAlign:"center"}}>Submission failed — check connection and try again.</p>:null}
-        <button style={Object.assign({},st.btnP,{opacity:(!allDone||submitting)?0.3:1})} disabled={!allDone||submitting} onClick={submitChecklist}>{submitting?"Submitting…":btnLabel}</button>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:"0.5rem"}}>
+          <span style={{fontSize:"0.68rem",color:C.t3}}>{completed} of {tasks.length} complete</span>
+          <span style={{fontSize:"0.68rem",fontWeight:600,color:C.teal}}>{pct}%</span>
+        </div>
+        <div style={{background:C.well,boxShadow:SH.downSm,borderRadius:"100px",height:"7px",overflow:"hidden",marginBottom:"1.5rem"}}>
+          <div style={{height:"100%",borderRadius:"100px",width:pct+"%",background:C.teal,transition:"width 0.4s ease"}}/>
+        </div>
+        <div style={{flex:1,marginBottom:"1.25rem"}}>
+          {tasks.map(function(task,i){return <TaskRow key={i} task={task} idx={i} isChecked={checked[i]} photoUrl={photos[i]} onToggle={function(){toggle(i);}} onUpload={handlePhotoUpload} uploadingIdx={uploadingIdx}/>;  })}
+          {tasks.length===0&&<p style={{textAlign:"center",color:C.t4,fontSize:"0.875rem",padding:"2rem 0"}}>No tasks for this shift yet.</p>}
+        </div>
+        {photoErr&&<p style={{fontSize:"0.75rem",color:C.pink,marginBottom:"0.5rem",textAlign:"center"}}>Photo upload failed — check connection and try again.</p>}
+        {submitErr&&<p style={{fontSize:"0.75rem",color:C.pink,marginBottom:"0.5rem",textAlign:"center"}}>Submission failed — check connection and try again.</p>}
+        {!allDone&&tasks.length>0&&<div style={{background:C.well,boxShadow:SH.downSm,borderRadius:"12px",padding:"0.65rem 1rem",display:"flex",alignItems:"center",gap:"0.625rem",marginBottom:"0.625rem"}}>
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style={{flexShrink:0}}><path d="M8 3L14 13H2L8 3Z" stroke={C.amber} strokeWidth="1.5" strokeLinejoin="round"/><path d="M8 7v3M8 11.5v.5" stroke={C.amber} strokeWidth="1.5" strokeLinecap="round"/></svg>
+          <span style={{fontSize:"0.7rem",color:C.amber,lineHeight:1.35}}>{incomplete} task{incomplete!==1?"s":""} not completed</span>
+        </div>}
+        {allDone
+          ?<BtnPink onClick={submitChecklist} disabled={submitting}>
+            {submitting?"Submitting…":"Submit Checklist"}
+            {!submitting&&<svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M2.5 7l3 3L11.5 4" stroke="rgba(255,255,255,0.9)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </BtnPink>
+          :<BtnAmber onClick={submitChecklist} disabled={submitting||tasks.length===0}>
+            {submitting?"Submitting…":"Submit anyway"}
+            {!submitting&&<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M9 5l3 3-3 3" stroke={C.amber} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+          </BtnAmber>
+        }
       </div>
     </div>
   );
 
   if(view==="success") return (
-    <div style={Object.assign({},st.page,st.center)}>
-      <div style={Object.assign({},st.card,{textAlign:"center"})}>
-        <div style={st.sicon}><CheckBig color="#c8ddb8"/></div>
-        <h2 style={{fontSize:"1.5rem",fontWeight:"600",marginBottom:".5rem",color:"#f0f8e8"}}>All done.</h2>
-        <p style={{fontSize:".875rem",color:"#a0c890",marginBottom:"2rem"}}>{shift} checklist for {sec} ({loc}) submitted by {name}.</p>
-        <button style={st.btnP} onClick={resetHome}>New Checklist</button>
+    <Frame>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"2rem"}}>
+        <Wordmark size="1.5rem"/>
       </div>
-    </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"2rem"}}>
+        <div style={{width:"90px",height:"90px",borderRadius:"50%",background:C.teal,boxShadow:"8px 8px 20px rgba(10,185,168,0.55),-4px -4px 14px rgba(13,216,196,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <CheckBig/>
+        </div>
+      </div>
+      <div style={{textAlign:"center",marginBottom:"1.75rem"}}>
+        <div style={{fontSize:"1.75rem",fontWeight:600,color:C.t1,marginBottom:"0.5rem",letterSpacing:"-0.02em"}}>All done.</div>
+        <div style={{fontSize:"0.8rem",color:C.t3,lineHeight:1.6}}>
+          {shift} checklist for <span style={{color:C.t2,fontWeight:500}}>{sec}</span> submitted.
+        </div>
+        <div style={{fontSize:"0.72rem",color:C.t4,marginTop:"0.25rem"}}>{loc} \u00b7 {name}</div>
+      </div>
+      <div style={{background:C.well,boxShadow:SH.downSm,borderRadius:"14px",padding:"0.875rem 1.25rem",marginBottom:"2rem",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div style={{textAlign:"left"}}>
+          <div style={{fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.t4,marginBottom:"0.2rem"}}>Completed</div>
+          <div style={{fontSize:"0.9rem",fontWeight:600,color:C.teal}}>{completed} / {tasks.length}</div>
+        </div>
+        <div style={{width:"1px",height:"28px",background:"#2A2648"}}/>
+        <div style={{textAlign:"left"}}>
+          <div style={{fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.t4,marginBottom:"0.2rem"}}>Shift</div>
+          <div style={{fontSize:"0.9rem",fontWeight:600,color:C.t2}}>{shift}</div>
+        </div>
+        <div style={{width:"1px",height:"28px",background:"#2A2648"}}/>
+        <div style={{textAlign:"left"}}>
+          <div style={{fontSize:"0.58rem",letterSpacing:"0.12em",textTransform:"uppercase",color:C.t4,marginBottom:"0.2rem"}}>Photos</div>
+          <div style={{fontSize:"0.9rem",fontWeight:600,color:C.t2}}>{photos.filter(function(p){return p;}).length} added</div>
+        </div>
+      </div>
+      <BtnPink onClick={function(){resetHome();setView("home");}}>
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="rgba(255,255,255,0.8)" strokeWidth="1.75" strokeLinecap="round"/></svg>
+        New Checklist
+      </BtnPink>
+      <button onClick={resetHome} style={{width:"100%",marginTop:"0.75rem",background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"16px",padding:"0.875rem",fontSize:"0.8rem",fontWeight:500,color:C.t3,cursor:"pointer",fontFamily:"inherit",transition:"all 0.15s"}}>Back to Home</button>
+    </Frame>
   );
 
   if(view==="issueLog") return (
-    <div style={Object.assign({},st.page,st.center)}>
-      <div style={st.card}>
-        <button style={st.backBtn} onClick={function(){resetIssueForm();setView("welcome");}}>← Back</button>
-        <p style={st.eyebrow}>Mise</p>
-        <h1 style={st.heading}>Log an Issue</h1>
-        <div style={st.stack}>
-          <div>
-            <label style={st.lbl}>Your Name</label>
-            <input style={st.field} placeholder="Enter your name" value={issueName} onChange={function(e){setIssueName(e.target.value);}}/>
-          </div>
-          <div>
-            <label style={st.lbl}>Item / Equipment</label>
-            <input style={st.field} placeholder="e.g. Fryer 2, Combi oven" value={issueItem} onChange={function(e){setIssueItem(e.target.value);}}/>
-          </div>
-          <div>
-            <label style={st.lbl}>Photo</label>
-            {issuePhotoUrl
-              ? <div style={{display:"flex",alignItems:"center",gap:".75rem",padding:".875rem 1rem",background:"#141414",border:"1px solid #222",borderRadius:".875rem"}}>
-                  <span style={{fontSize:"1.25rem"}}>📷</span>
-                  <span style={{fontSize:".8rem",color:"#4ade80",flex:"1"}}>Photo attached ✓</span>
-                  <button style={{background:"none",border:"none",color:"#555",fontSize:".75rem",cursor:"pointer"}} onClick={function(){setIssuePhoto(null);setIssuePhotoUrl(null);}}>Remove</button>
-                </div>
-              : <label style={{display:"block",width:"100%",padding:".875rem 1rem",background:"#141414",border:"1px dashed #333",borderRadius:".875rem",textAlign:"center",cursor:"pointer",color:issueUploading?"#555":"#f59e0b",fontSize:".875rem"}}>
-                  {issueUploading?"Uploading…":"📷 Take or upload photo"}
-                  <input type="file" accept="image/*" capture="environment" style={{display:"none"}} disabled={issueUploading}
-                    onChange={function(e){if(e.target.files&&e.target.files[0])handleIssuePhotoUpload(e.target.files[0]);}}/>
-                </label>
-            }
-          </div>
-          {issueErr?<p style={{fontSize:".75rem",color:"#ef4444",textAlign:"center"}}>{issueErr}</p>:null}
-          <button style={Object.assign({},st.btnP,{opacity:(!issueName.trim()||!issueItem.trim()||!issuePhotoUrl||issueSubmitting)?0.25:1})}
-            disabled={!issueName.trim()||!issueItem.trim()||!issuePhotoUrl||issueSubmitting}
-            onClick={submitIssue}>{issueSubmitting?"Submitting…":"Submit Issue →"}</button>
-        </div>
+    <Frame>
+      <NavBar onBack={function(){resetIssueForm();setView("welcome");}}/>
+      <div style={{marginBottom:"1.75rem"}}>
+        <div style={{fontSize:"1.15rem",fontWeight:600,color:C.t1,marginBottom:"0.2rem"}}>Log an Issue</div>
+        <div style={{fontSize:"0.72rem",color:C.t4}}>Photo, item name and submit</div>
       </div>
-    </div>
+      <div style={{display:"flex",flexDirection:"column",gap:"1.25rem"}}>
+        <div><Lbl>Your name</Lbl><InputField value={issueName} onChange={function(e){setIssueName(e.target.value);}} placeholder="Enter your name"/></div>
+        <div><Lbl>Item / Equipment</Lbl><InputField value={issueItem} onChange={function(e){setIssueItem(e.target.value);}} placeholder="e.g. Fryer 2, Combi oven"/></div>
+        <div>
+          <Lbl>Photo</Lbl>
+          {issuePhotoUrl
+            ?<div style={{display:"flex",alignItems:"center",gap:"0.75rem",padding:"0.875rem 1rem",background:C.surface,boxShadow:SH.upSm,borderRadius:"14px"}}>
+               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1.5" stroke={C.teal} strokeWidth="1.25"/><circle cx="8" cy="9" r="2" stroke={C.teal} strokeWidth="1.25"/><path d="M6 5l1-2h2l1 2" stroke={C.teal} strokeWidth="1.25" strokeLinejoin="round"/></svg>
+               <span style={{fontSize:"0.8rem",color:C.teal,flex:1}}>Photo attached</span>
+               <button style={{background:"none",border:"none",color:C.t4,fontSize:"0.75rem",cursor:"pointer",fontFamily:"inherit"}} onClick={function(){setIssuePhoto(null);setIssuePhotoUrl(null);}}>Remove</button>
+             </div>
+            :<label style={{display:"block",width:"100%",padding:"0.875rem 1rem",background:C.well,boxShadow:SH.down,borderRadius:"14px",textAlign:"center",cursor:"pointer",color:issueUploading?C.t4:C.amber,fontSize:"0.875rem",boxSizing:"border-box"}}>
+               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{marginRight:"0.4rem",verticalAlign:"middle"}}><rect x="2" y="5" width="12" height="8" rx="1.5" stroke={C.amber} strokeWidth="1.25"/><circle cx="8" cy="9" r="2" stroke={C.amber} strokeWidth="1.25"/><path d="M6 5l1-2h2l1 2" stroke={C.amber} strokeWidth="1.25" strokeLinejoin="round"/></svg>
+               {issueUploading?"Uploading…":"Take or upload photo"}
+               <input type="file" accept="image/*" capture="environment" style={{display:"none"}} disabled={issueUploading} onChange={function(e){if(e.target.files&&e.target.files[0])handleIssuePhotoUpload(e.target.files[0]);}}/>
+             </label>
+          }
+        </div>
+        {issueErr&&<p style={{fontSize:"0.75rem",color:C.pink,textAlign:"center"}}>{issueErr}</p>}
+        <BtnPink onClick={submitIssue} disabled={!issueName.trim()||!issueItem.trim()||!issuePhotoUrl||issueSubmitting}>
+          {issueSubmitting?"Submitting…":"Submit Issue"}
+          {!issueSubmitting&&<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 8h8M9 5l3 3-3 3" stroke="rgba(255,255,255,0.8)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+        </BtnPink>
+      </div>
+    </Frame>
   );
 
   if(view==="issueSuccess") return (
-    <div style={Object.assign({},st.page,st.center)}>
-      <div style={Object.assign({},st.card,{textAlign:"center"})}>
-        <div style={st.sicon}><CheckBig color="#c8ddb8"/></div>
-        <h2 style={{fontSize:"1.5rem",fontWeight:"600",marginBottom:".5rem",color:"#f0f8e8"}}>Issue logged.</h2>
-        <p style={{fontSize:".875rem",color:"#a0c890",marginBottom:"2rem"}}>{issueItem} logged by {issueName}.</p>
-        <button style={st.btnP} onClick={function(){resetIssueForm();setView("welcome");}}>Back to Home</button>
+    <Frame>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"2rem"}}>
+        <Wordmark size="1.5rem"/>
       </div>
-    </div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",marginBottom:"2rem"}}>
+        <div style={{width:"90px",height:"90px",borderRadius:"50%",background:C.teal,boxShadow:"8px 8px 20px rgba(10,185,168,0.55),-4px -4px 14px rgba(13,216,196,0.25)",display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <CheckBig/>
+        </div>
+      </div>
+      <div style={{textAlign:"center",marginBottom:"2rem"}}>
+        <div style={{fontSize:"1.75rem",fontWeight:600,color:C.t1,marginBottom:"0.5rem",letterSpacing:"-0.02em"}}>Issue logged.</div>
+        <div style={{fontSize:"0.8rem",color:C.t3}}><span style={{color:C.t2,fontWeight:500}}>{issueItem}</span> logged by {issueName}.</div>
+      </div>
+      <BtnPink onClick={function(){resetIssueForm();setView("welcome");}}>Back to Home</BtnPink>
+    </Frame>
   );
 
   if(view==="adminLogin") return (
-    <div style={Object.assign({},st.page,st.center)}>
-      <div style={st.card}>
-        <button style={st.backBtn} onClick={function(){setView("home");setAdminPw("");setAdminErr(false);}}>← Back</button>
-        <h2 style={{fontSize:"1.3rem",fontWeight:"600",marginBottom:"1.5rem"}}>Admin Access</h2>
-        <input type="password" style={Object.assign({},st.field,{marginBottom:".75rem"})} placeholder="Password" value={adminPw}
-          onChange={function(e){setAdminPw(e.target.value);setAdminErr(false);}}
-          onKeyDown={function(e){if(e.key==="Enter")tryLogin();}}
-        />
-        {adminErr?<p style={{fontSize:".75rem",color:"#c0604a",marginBottom:".75rem"}}>Incorrect password.</p>:null}
-        <button style={st.btnP} onClick={tryLogin}>Enter</button>
+    <Frame>
+      <NavBar onBack={function(){setView("welcome");setAdminPw("");setAdminErr(false);}}/>
+      <div style={{width:"64px",height:"64px",borderRadius:"50%",background:C.surface,boxShadow:SH.up,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 1.75rem"}}>
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x="5" y="11" width="14" height="10" rx="2" stroke={C.t3} strokeWidth="1.75"/><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke={C.t3} strokeWidth="1.75" strokeLinecap="round"/><circle cx="12" cy="16" r="1.5" fill={C.t3}/></svg>
       </div>
-    </div>
+      <div style={{textAlign:"center",marginBottom:"2rem"}}>
+        <div style={{fontSize:"1.3rem",fontWeight:600,color:C.t1,marginBottom:"0.35rem"}}>Admin Access</div>
+        <div style={{fontSize:"0.75rem",color:C.t4}}>Enter your password to continue</div>
+      </div>
+      <div>
+        <Lbl>Password</Lbl>
+        <InputField type="password" value={adminPw} onChange={function(e){setAdminPw(e.target.value);setAdminErr(false);}} placeholder="Enter password"/>
+        {adminErr&&<p style={{fontSize:"0.7rem",color:C.pink,marginTop:"0.5rem"}}>Incorrect password.</p>}
+        <div style={{marginTop:"1rem"}}>
+          <BtnPink onClick={tryLogin}>Enter Admin →</BtnPink>
+        </div>
+      </div>
+    </Frame>
   );
 
-  if(view==="admin") return (
-    <div style={Object.assign({},st.page,st.col)}>
-      <div style={st.adminWrap}>
-        <div style={st.rowSB}>
-          <button style={Object.assign({},st.backBtn,{marginBottom:"0"})} onClick={function(){setView("welcome");exitSelectMode();}}>← Exit</button>
-          <span style={{fontSize:".9rem",fontWeight:"600"}}>Admin</span>
-          <div style={{width:"3rem"}}/>
-        </div>
-        <div style={st.tabRow}>
-          <TabBtn label="Submission Log" active={adminTab==="logs"} onClick={function(){setAdminTab("logs");exitSelectMode();}}/>
-          <TabBtn label="Results" active={adminTab==="results"} onClick={function(){setAdminTab("results");exitSelectMode();}}/>
-          <TabBtn label="Issue Log" active={adminTab==="issues"} onClick={function(){setAdminTab("issues");exitSelectMode();}}/>
-          <TabBtn label="Edit Checklists" active={adminTab==="edit"} onClick={function(){setAdminTab("edit");exitSelectMode();}}/>
-        </div>
+  if(view==="admin"){
+    const {groups:logGroups,keys:logKeys}=groupLogsByDate(logs);
+    const {groups:issueGroups,keys:issueKeys}=groupIssuesByDate(issues.filter(function(i){
+      const now=new Date(),d=new Date(i.created_at);
+      const dateOk=issueFilterDate==="All"||(issueFilterDate==="Today"&&d.toDateString()===now.toDateString())||(issueFilterDate==="Last 7 days"&&(now-d)<7*86400000)||(issueFilterDate==="Last 30 days"&&(now-d)<30*86400000);
+      const nameOk=!issueFilterName.trim()||i.name.toLowerCase().includes(issueFilterName.toLowerCase());
+      return dateOk&&nameOk;
+    }));
+    return (
+      <div style={{minHeight:"100vh",background:C.bg,padding:"2rem 1.5rem"}}>
+        <div style={{maxWidth:"640px",width:"100%",margin:"0 auto"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"1.75rem"}}>
+            <button style={{background:"none",border:"none",color:C.t4,fontSize:"0.8rem",cursor:"pointer",padding:0,fontFamily:"inherit",display:"flex",alignItems:"center",gap:"5px"}} onClick={function(){setView("welcome");exitSelectMode();}}>
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 4L6 8l4 4" stroke={C.t4} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Exit
+            </button>
+            <Wordmark/>
+            <div style={{fontSize:"0.65rem",letterSpacing:"0.1em",textTransform:"uppercase",color:C.t4}}>Admin</div>
+          </div>
 
-        {adminTab==="results"?<ResultsView logs={logs} logsLoading={logsLoading} logsErr={logsErr} onRefresh={fetchLogs}/>:null}
-
-        {adminTab==="logs"?(
-          <div>
-            
-            <div style={{display:"flex",gap:".5rem",marginBottom:"1rem",flexWrap:"wrap",alignItems:"center"}}>
-              <button style={st.btnDl} onClick={function(){downloadCSV(logs);}} disabled={logs.length===0||deleting}>↓ CSV</button>
-              <button style={st.btnG} onClick={fetchLogs} disabled={deleting}>↺ Refresh</button>
-              {!selectMode?(
-                <button style={logs.length>0?st.btnG:Object.assign({},st.btnG,{opacity:.4,cursor:"not-allowed"})} disabled={logs.length===0||deleting} onClick={function(){setSelectMode(true);}}>Select</button>
-              ):(
-                <>
-                  <button style={st.btnG} onClick={toggleSelectAll}>{selectedIds.length===logs.length?"Deselect all":"Select all"}</button>
-                  <button style={selectedIds.length>0?st.btnDanger:Object.assign({},st.btnDanger,{opacity:.4,cursor:"not-allowed"})} disabled={selectedIds.length===0||deleting} onClick={handleDeleteSelected}>
-                    {deleting?"Deleting…":"Delete ("+selectedIds.length+")"}
-                  </button>
-                  <button style={st.btnG} onClick={exitSelectMode}>Cancel</button>
-                </>
-              )}
-              <button style={logs.length>0?Object.assign({},st.btnDanger,{marginLeft:"auto"}):Object.assign({},st.btnDanger,{marginLeft:"auto",opacity:.4,cursor:"not-allowed"})} disabled={logs.length===0||deleting} onClick={handleDeleteAll}>Delete all</button>
-            </div>
-
-            {logsLoading?<p style={{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}}>Loading…</p>
-            :logsErr?<p style={{fontSize:".875rem",color:"#e07858",textAlign:"center",padding:"3rem 0"}}>Failed to load. Check connection.</p>
-            :logs.length===0?<p style={{fontSize:".875rem",color:"#b8c8a8",textAlign:"center",padding:"3rem 0"}}>No submissions yet.</p>
-            :logs.map(function(log){
-              const isSelected=selectedIds.indexOf(log.id)>=0;
-              return(
-                <div key={log.id} style={Object.assign({},st.logCard,isSelected?st.logCardSelected:{})}>
-                  {selectMode?React.createElement("input",{type:"checkbox",style:st.checkbox,checked:isSelected,onChange:function(){toggleSelect(log.id);}}):null}
-                  <div style={{flex:"1",cursor:"pointer"}} onClick={function(){selectMode?toggleSelect(log.id):setExpanded(expanded===log.id?null:log.id);}}>
-                    <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
-                      <div>
-                        <p style={{fontWeight:"500",fontSize:".875rem",color:"#e8f5e0"}}>{log.name}</p>
-                        <p style={{fontSize:".7rem",color:"#b8c8a8",marginTop:".2rem"}}>{log.location} · {log.section} · {log.shift}</p>
-                      </div>
-                      <div style={{textAlign:"right",flexShrink:"0",marginLeft:"1rem"}}>
-                        <p style={{fontSize:".7rem",color:"#b8c8a8"}}>{new Date(log.created_at).toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"})}</p>
-                        <p style={{fontSize:".7rem",fontWeight:"500",marginTop:".2rem",color:log.completed===log.total?"#7ad86a":"#d4a860"}}>{log.completed}/{log.total}</p>
-                      </div>
-                    </div>
-                    {!selectMode&&expanded===log.id?(
-                      <div style={st.logExpand}>
-                        {(log.tasks||[]).map(function(t,i){return(
-                          <div key={i} style={{display:"flex",alignItems:"center",gap:".5rem",fontSize:".75rem",marginBottom:".375rem",color:t.done?"#5a8050":"#d4a860"}}>
-                            <span>{t.done?"✓":"○"}</span>
-                            <span style={t.done?{textDecoration:"line-through"}:{}}>{t.task}</span>
-                            {t.photoUrl?<a href={t.photoUrl} target="_blank" rel="noreferrer" style={{color:"#7ab898",marginLeft:"auto",flexShrink:"0"}}>📷 view</a>:null}
-                          </div>
-                        );})}
-                      </div>
-                    ):null}
-                  </div>
-                </div>
-              );
+          <div style={{display:"flex",gap:"0.5rem",marginBottom:"1.5rem",overflowX:"auto",paddingBottom:"0.25rem"}}>
+            {[["logs","Submission Log"],["results","Results"],["issues","Issue Log"],["edit","Edit Checklists"]].map(function(tab){
+              return <TabBtn key={tab[0]} label={tab[1]} active={adminTab===tab[0]} onClick={function(){setAdminTab(tab[0]);exitSelectMode();}}/>;
             })}
           </div>
-        ):null}
 
-        {adminTab==="issues"?(
-          <div>
-            <div style={{display:"flex",gap:".5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}}>
-              <button style={st.btnG} onClick={fetchIssues} disabled={issuesLoading}>↺ Refresh</button>
-              <select style={st.fieldSm} value={issueFilterDate} onChange={function(e){setIssueFilterDate(e.target.value);}}>
-                {["All","Today","Last 7 days","Last 30 days"].map(function(d){return React.createElement("option",{key:d},d);})}
-              </select>
-              <input style={Object.assign({},st.fieldSm,{minWidth:"130px"})} placeholder="Filter by name…" value={issueFilterName} onChange={function(e){setIssueFilterName(e.target.value);}}/>
+          {adminTab==="results"&&<ResultsView logs={logs} logsLoading={logsLoading} logsErr={logsErr} onRefresh={fetchLogs}/>}
+
+          {adminTab==="logs"&&<div>
+            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}}>
+              <ActionBtn onClick={function(){downloadCSV(logs);}} disabled={logs.length===0||deleting} variant="teal">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M4 9l4 4 4-4" stroke={C.teal} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                CSV
+              </ActionBtn>
+              <ActionBtn onClick={fetchLogs} disabled={deleting}>
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 1 0 1.5-3.5" stroke={C.t3} strokeWidth="1.5" strokeLinecap="round"/><path d="M3 4.5V8h3.5" stroke={C.t3} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Refresh
+              </ActionBtn>
+              {!selectMode
+                ?<ActionBtn onClick={function(){setSelectMode(true);}} disabled={logs.length===0||deleting}>Select</ActionBtn>
+                :<>
+                  <ActionBtn onClick={toggleSelectAll}>{selectedIds.length===logs.length?"Deselect all":"Select all"}</ActionBtn>
+                  <ActionBtn onClick={handleDeleteSelected} disabled={selectedIds.length===0||deleting} variant="danger">
+                    {deleting?"Deleting…":"Delete ("+selectedIds.length+")"}
+                  </ActionBtn>
+                  <ActionBtn onClick={exitSelectMode}>Cancel</ActionBtn>
+                </>
+              }
+              <div style={{marginLeft:"auto"}}>
+                <ActionBtn onClick={handleDeleteAll} disabled={logs.length===0||deleting} variant="danger">Delete all</ActionBtn>
+              </div>
             </div>
-            {issuesLoading?<p style={{fontSize:".875rem",color:"#444",textAlign:"center",padding:"3rem 0"}}>Loading…</p>
-            :issuesErr?<p style={{fontSize:".875rem",color:"#ef4444",textAlign:"center",padding:"3rem 0"}}>Failed to load.</p>
-            :(function(){
-              const now=new Date();
-              const filtered=issues.filter(function(i){
-                const d=new Date(i.created_at);
-                const dateOk=issueFilterDate==="All"||(issueFilterDate==="Today"&&d.toDateString()===now.toDateString())||(issueFilterDate==="Last 7 days"&&(now-d)<7*86400000)||(issueFilterDate==="Last 30 days"&&(now-d)<30*86400000);
-                const nameOk=!issueFilterName.trim()||i.name.toLowerCase().includes(issueFilterName.toLowerCase());
-                return dateOk&&nameOk;
-              });
-              if(filtered.length===0) return React.createElement("p",{style:{fontSize:".875rem",color:"#333",textAlign:"center",padding:"3rem 0"}},"No issues match filters.");
-              return filtered.map(function(issue){
-                return React.createElement("div",{key:issue.id,style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:".75rem"}},
-                  React.createElement("div",{style:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:".75rem"}},
-                    React.createElement("div",null,
-                      React.createElement("p",{style:{fontWeight:"600",fontSize:".9rem",color:"#f0f8e8",marginBottom:".2rem"}},issue.item_name),
-                      React.createElement("p",{style:{fontSize:".75rem",color:"#a0c890"}},issue.name),
-                      React.createElement("p",{style:{fontSize:".7rem",color:"#555",marginTop:".2rem"}},new Date(issue.created_at).toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"}))
-                    )
-                  ),
-                  issue.photo_url?React.createElement("a",{href:issue.photo_url,target:"_blank",rel:"noreferrer",style:{display:"block",borderRadius:".625rem",overflow:"hidden",border:"1px solid #222",maxWidth:"260px"}},
-                    React.createElement("img",{src:issue.photo_url,alt:issue.item_name,style:{width:"100%",display:"block",objectFit:"cover",maxHeight:"180px"}})
-                  ):null
-                );
-              });
-            })()}
-          </div>
-        ):null}
+            {logsLoading&&<p style={{textAlign:"center",padding:"3rem 0",color:C.t4,fontSize:"0.875rem"}}>Loading…</p>}
+            {logsErr&&<p style={{textAlign:"center",padding:"3rem 0",color:C.pink,fontSize:"0.875rem"}}>Failed to load. Check connection.</p>}
+            {!logsLoading&&!logsErr&&logs.length===0&&<p style={{textAlign:"center",padding:"3rem 0",color:C.t4,fontSize:"0.875rem"}}>No submissions yet.</p>}
+            {!logsLoading&&!logsErr&&logs.length>0&&logKeys.map(function(dk){
+              const dateGroup=logGroups[dk];
+              const totalInDate=Object.values(dateGroup).reduce(function(a,arr){return a+arr.length;},0);
+              return <div key={dk}>
+                <DateHdr label={dk} count={totalInDate}/>
+                {Object.keys(dateGroup).map(function(locationKey){
+                  return <div key={locationKey}>
+                    <div style={{fontSize:"0.58rem",fontWeight:600,letterSpacing:"0.14em",textTransform:"uppercase",color:C.t4,marginBottom:"0.5rem",marginTop:"0.875rem",display:"flex",alignItems:"center",gap:"0.4rem"}}>
+                      <div style={{width:"3px",height:"3px",background:C.t4,borderRadius:"50%",flexShrink:0}}/>
+                      {locationKey}
+                    </div>
+                    {dateGroup[locationKey].map(function(log){
+                      const isSelected=selectedIds.indexOf(log.id)>=0;
+                      const scoreColor=log.completed===log.total?C.teal:C.amber;
+                      return <div key={log.id} style={{background:isSelected?"rgba(232,41,122,0.08)":C.surface,boxShadow:isSelected?"5px 5px 12px rgba(0,0,0,0.55),-3px -3px 8px rgba(85,65,185,0.2),inset 0 0 0 1.5px rgba(232,41,122,0.3)":SH.upMd,borderRadius:"14px",padding:"0.875rem 1rem",marginBottom:"0.5rem",display:"flex",alignItems:"flex-start",gap:"0.75rem",cursor:"pointer",transition:"all 0.18s"}}
+                        onClick={function(){selectMode?toggleSelect(log.id):setExpanded(expanded===log.id?null:log.id);}}>
+                        {selectMode&&<input type="checkbox" checked={isSelected} onChange={function(){toggleSelect(log.id);}} style={{width:"1.1rem",height:"1.1rem",accentColor:C.teal,cursor:"pointer",flexShrink:0,marginTop:"0.15rem"}}/>}
+                        <div style={{flex:1}}>
+                          <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+                            <div>
+                              <p style={{fontWeight:500,fontSize:"0.875rem",color:C.t1,marginBottom:"0.15rem"}}>{log.name}</p>
+                              <p style={{fontSize:"0.68rem",color:C.t3}}>{log.section} \u00b7 {log.shift}</p>
+                            </div>
+                            <div style={{textAlign:"right",flexShrink:0,marginLeft:"1rem"}}>
+                              <p style={{fontSize:"0.63rem",color:C.t4,marginBottom:"0.2rem"}}>{new Date(log.created_at).toLocaleString("en-AU",{hour:"2-digit",minute:"2-digit"})}</p>
+                              <p style={{fontSize:"0.75rem",fontWeight:600,color:scoreColor}}>{log.completed}/{log.total}</p>
+                            </div>
+                          </div>
+                          {!selectMode&&expanded===log.id&&<div style={{marginTop:"0.7rem",paddingTop:"0.7rem",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                            {(log.tasks||[]).map(function(t,i){return(
+                              <div key={i} style={{display:"flex",alignItems:"center",gap:"0.5rem",fontSize:"0.7rem",marginBottom:"0.3rem",color:t.done?C.t4:C.amber}}>
+                                <svg width="10" height="10" viewBox="0 0 14 14" fill="none">{t.done?<path d="M2 7l3.5 3.5L12 4" stroke={C.teal} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>:<circle cx="7" cy="7" r="3" stroke={C.amber} strokeWidth="1.25"/>}</svg>
+                                <span style={t.done?{textDecoration:"line-through"}:{}}>{t.task}</span>
+                                {t.photoUrl&&<a href={t.photoUrl} target="_blank" rel="noreferrer" style={{color:C.teal,marginLeft:"auto",flexShrink:0,fontSize:"0.63rem"}}>📷 view</a>}
+                              </div>
+                            );})}
+                          </div>}
+                        </div>
+                      </div>;
+                    })}
+                  </div>;
+                })}
+              </div>;
+            })}
+          </div>}
 
-        {adminTab==="edit"?(
-          <div>
-            <p style={{fontSize:".7rem",color:"#b8c8a8",marginBottom:"1rem"}}>Tap 📷 on a task to require a photo. Changes save instantly to all devices.{configSaving?" Saving…":""}</p>
-            <div style={st.chipRow}>{LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);const secs=getSections(l);setESec(secs.length>0?secs[0]:"");setNewSecName("");}}/>; })}</div>
+          {adminTab==="issues"&&<div>
+            <div style={{display:"flex",gap:"0.5rem",marginBottom:"1.25rem",flexWrap:"wrap",alignItems:"center"}}>
+              <input value={issueFilterName} onChange={function(e){setIssueFilterName(e.target.value);}} placeholder="Filter by name…" style={{flex:1,minWidth:"120px",background:C.well,boxShadow:SH.downSm,border:"none",borderRadius:"10px",padding:"0.5rem 0.75rem",color:C.t1,fontSize:"0.72rem",fontFamily:"inherit",outline:"none"}}/>
+              <select value={issueFilterDate} onChange={function(e){setIssueFilterDate(e.target.value);}} style={{background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.45rem 0.75rem",fontSize:"0.7rem",color:C.t3,fontFamily:"inherit",outline:"none"}}>
+                {["All","Today","Last 7 days","Last 30 days"].map(function(d){return <option key={d}>{d}</option>;})}
+              </select>
+              <ActionBtn onClick={fetchIssues} disabled={issuesLoading} variant="teal">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 1 0 1.5-3.5" stroke={C.teal} strokeWidth="1.5" strokeLinecap="round"/><path d="M3 4.5V8h3.5" stroke={C.teal} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              </ActionBtn>
+            </div>
+            {issuesLoading&&<p style={{textAlign:"center",padding:"3rem 0",color:C.t4,fontSize:"0.875rem"}}>Loading…</p>}
+            {issuesErr&&<p style={{textAlign:"center",padding:"3rem 0",color:C.pink,fontSize:"0.875rem"}}>Failed to load.</p>}
+            {!issuesLoading&&!issuesErr&&issueKeys.length===0&&<p style={{textAlign:"center",padding:"3rem 0",color:C.t4,fontSize:"0.875rem"}}>No issues match filters.</p>}
+            {!issuesLoading&&!issuesErr&&issueKeys.map(function(dk){
+              return <div key={dk}>
+                <DateHdr label={dk} count={issueGroups[dk].length}/>
+                {issueGroups[dk].map(function(issue){
+                  return <div key={issue.id} className="nm-card" onClick={function(){setExpanded(expanded===issue.id?null:issue.id);}} style={{background:C.surface,boxShadow:SH.upMd,borderRadius:"14px",padding:"0.875rem 1rem",marginBottom:"0.625rem",cursor:"pointer",border:expanded===issue.id?"1px solid rgba(196,128,58,0.25)":"none",transition:"all 0.18s",overflow:"hidden"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:"0.75rem"}}>
+                      <div style={{width:"38px",height:"38px",borderRadius:"10px",background:"rgba(196,128,58,0.12)",boxShadow:SH.upSm,border:"1px solid rgba(196,128,58,0.2)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10.5 2.5a2.5 2.5 0 0 1 0 5L5 13a1.5 1.5 0 0 1-2-2l5.5-5.5a2.5 2.5 0 0 1 2-3z" stroke={C.amber} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><circle cx="11" cy="5" r="1" fill={C.amber}/></svg>
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:"0.875rem",fontWeight:500,color:C.t1,marginBottom:"0.15rem"}}>{issue.item_name}</div>
+                        <div style={{fontSize:"0.68rem",color:C.t3}}>Logged by {issue.name}</div>
+                      </div>
+                      <div style={{textAlign:"right",flexShrink:0}}>
+                        <div style={{fontSize:"0.63rem",color:C.t4}}>{new Date(issue.created_at).toLocaleString("en-AU",{hour:"2-digit",minute:"2-digit"})}</div>
+                        {issue.photo_url&&<div style={{width:"46px",height:"46px",borderRadius:"8px",marginTop:"0.35rem",background:C.well,boxShadow:SH.downSm,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="5" width="12" height="8" rx="1.5" stroke={C.amber} strokeWidth="1.25"/><circle cx="8" cy="9" r="2" stroke={C.amber} strokeWidth="1.25"/><path d="M6 5l1-2h2l1 2" stroke={C.amber} strokeWidth="1.25" strokeLinejoin="round"/></svg>
+                        </div>}
+                      </div>
+                    </div>
+                    {expanded===issue.id&&issue.photo_url&&<div style={{marginTop:"0.875rem",paddingTop:"0.875rem",borderTop:"1px solid rgba(255,255,255,0.05)"}}>
+                      <a href={issue.photo_url} target="_blank" rel="noreferrer" style={{display:"block",borderRadius:"12px",overflow:"hidden",border:"1px solid rgba(196,128,58,0.2)"}}>
+                        <img src={issue.photo_url} alt={issue.item_name} style={{width:"100%",display:"block",objectFit:"cover",maxHeight:"200px"}}/>
+                      </a>
+                      <div style={{display:"flex",justifyContent:"flex-end",marginTop:"0.625rem"}}>
+                        <a href={issue.photo_url} target="_blank" rel="noreferrer" style={{fontSize:"0.68rem",color:C.teal,textDecoration:"none",border:"1px solid rgba(13,216,196,0.25)",borderRadius:"8px",padding:"0.35rem 0.75rem"}}>View full photo →</a>
+                      </div>
+                    </div>}
+                  </div>;
+                })}
+              </div>;
+            })}
+          </div>}
 
-            
-            <div style={{marginBottom:".75rem"}}>
-              <p style={{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".5rem"}}>Sections</p>
-              <div style={{display:"flex",flexWrap:"wrap",gap:".375rem",marginBottom:".5rem"}}>
-                {eSections.map(function(sc){
-                  return React.createElement("div",{key:sc,style:{display:"flex",alignItems:"center",gap:"0",border:"1px solid "+(eSec===sc?"#c8ddb8":"#1e2e1e"),borderRadius:".5rem",overflow:"hidden"}},
-                    React.createElement("button",{style:{padding:".375rem .625rem",fontSize:".75rem",fontWeight:"500",background:eSec===sc?"#c8ddb8":"#101810",color:eSec===sc?"#0a130a":"#4d6848",cursor:"pointer",border:"none"},onClick:function(){setESec(sc);}},sc),
-                    eSections.length>1?React.createElement("button",{style:{padding:".375rem .375rem",fontSize:".7rem",background:eSec===sc?"#c8ddb8":"#101810",color:eSec===sc?"#3a6030":"#263826",cursor:"pointer",border:"none",borderLeft:"1px solid "+(eSec===sc?"#a0c898":"#1e2e1e")},onClick:function(e){e.stopPropagation();removeSection(eLoc,sc);}},"×"):null
-                  );
+          {adminTab==="edit"&&<div>
+            <div style={{fontSize:"0.7rem",color:C.t4,marginBottom:"1.25rem",display:"flex",alignItems:"center",gap:"0.5rem"}}>
+              <div style={{width:"6px",height:"6px",borderRadius:"50%",background:configSaving?"#C4803A":C.teal,boxShadow:configSaving?"0 0 5px rgba(196,128,58,0.5)":"0 0 5px rgba(13,216,196,0.5)"}}/>
+              {configSaving?"Saving…":"Changes save instantly to all devices"}
+            </div>
+
+            <SecLbl>Location</SecLbl>
+            <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginBottom:"1.25rem"}}>
+              {LOCS.map(function(l){return <Chip key={l} label={l} active={eLoc===l} onClick={function(){setELoc(l);const secs=getSections(l);setESec(secs.length>0?secs[0]:"");setNewSecName("");}}/>;  })}
+            </div>
+
+            <SecLbl>Section</SecLbl>
+            <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginBottom:"1.25rem"}}>
+              {eSections.map(function(sc){
+                return <div key={sc} style={{display:"flex",alignItems:"center",background:eSec===sc?C.teal:C.surface,boxShadow:eSec===sc?SH.teal:SH.upSm,borderRadius:"10px",overflow:"hidden",transition:"all 0.18s"}}>
+                  <button onClick={function(){setESec(sc);}} style={{background:"none",border:"none",padding:"0.5rem 0.75rem",fontSize:"0.72rem",fontWeight:eSec===sc?600:500,color:eSec===sc?"#0C0A22":C.t3,cursor:"pointer",fontFamily:"inherit"}}>{sc}</button>
+                  {eSections.length>1&&<button onClick={function(e){e.stopPropagation();removeSection(eLoc,sc);}} style={{background:"none",border:"none",borderLeft:"1px solid "+(eSec===sc?"rgba(0,0,0,0.15)":"rgba(255,255,255,0.05)"),padding:"0.5rem 0.5rem",fontSize:"0.75rem",color:eSec===sc?"rgba(0,0,0,0.5)":C.t4,cursor:"pointer",fontFamily:"inherit",lineHeight:1}}>×</button>}
+                </div>;
+              })}
+              <div style={{display:"flex",gap:"0.5rem",alignItems:"center"}}>
+                <input value={newSecName} onChange={function(e){setNewSecName(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}} placeholder="New section…" style={{background:C.well,boxShadow:SH.downSm,border:"none",borderRadius:"10px",padding:"0.5rem 0.75rem",fontSize:"0.72rem",color:C.t1,fontFamily:"inherit",outline:"none",width:"120px"}}/>
+                <button onClick={function(){if(newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}} style={{background:C.surface,boxShadow:SH.upSm,border:"none",borderRadius:"10px",padding:"0.5rem 0.75rem",fontSize:"0.72rem",color:C.t3,cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>+ Add</button>
+              </div>
+            </div>
+
+            {eSec&&<div>
+              <SecLbl>Active shifts — {eSec}</SecLbl>
+              <div style={{display:"flex",flexWrap:"wrap",gap:"0.5rem",marginBottom:"1.25rem"}}>
+                {SHIFTS.map(function(sh){
+                  const on=eEnabled[sh]!==false;
+                  return <button key={sh} onClick={function(){toggleShiftEnabled(eLoc,eSec,sh);}} style={{background:on?C.teal:C.surface,boxShadow:on?SH.teal:SH.upSm,border:"none",borderRadius:"8px",padding:"0.4rem 0.625rem",fontSize:"0.65rem",fontWeight:on?600:500,color:on?"#0C0A22":C.t3,cursor:"pointer",fontFamily:"inherit",transition:"all 0.18s"}}>{sh}</button>;
                 })}
               </div>
-              
-              <div style={{display:"flex",gap:".5rem",alignItems:"center"}}>
-                <input style={Object.assign({},st.editInput,{flex:"1",padding:".5rem .75rem",fontSize:".8rem"})} placeholder="New section name…" value={newSecName} onChange={function(e){setNewSecName(e.target.value);}} onKeyDown={function(e){if(e.key==="Enter"&&newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}}/>
-                <button style={Object.assign({},st.btnG,{flexShrink:"0"})} onClick={function(){if(newSecName.trim()){addSection(eLoc,newSecName);setNewSecName("");}}}>+ Add</button>
+
+              <SecLbl>Tasks</SecLbl>
+              <div style={{display:"flex",gap:"0.5rem",flexWrap:"wrap",marginBottom:"1rem"}}>
+                {SHIFTS.map(function(sh){return <Chip key={sh} label={sh} active={eShift===sh} onClick={function(){setEShift(sh);}}/>;  })}
               </div>
-            </div>
+              <div style={{marginBottom:"0.75rem"}}>
+                {eTasks.map(function(task,i){return <EditTaskRow key={i} task={task} idx={i}
+                  onUpdateText={function(idx,text){updateTaskText(eLoc,eSec,eShift,idx,text);}}
+                  onTogglePhoto={function(idx){toggleTaskPhoto(eLoc,eSec,eShift,idx);}}
+                  onSetExample={function(idx,url){setTaskExamplePhoto(eLoc,eSec,eShift,idx,url);}}
+                  onRemove={function(idx){removeTask(eLoc,eSec,eShift,idx);}}
+                />;  })}
+              </div>
+              <button onClick={function(){addTask(eLoc,eSec,eShift);}} style={{width:"100%",background:"transparent",border:"1px dashed #2A2648",borderRadius:"14px",padding:"0.875rem",fontSize:"0.8rem",color:C.t4,cursor:"pointer",fontFamily:"inherit",transition:"all 0.18s"}}>+ Add task</button>
+            </div>}
+          </div>}
 
-            
-            {eSec?React.createElement("div",{style:{background:"#141414",border:"1px solid #222",borderRadius:".875rem",padding:"1rem",marginBottom:"1rem"}},
-              React.createElement("p",{style:{fontSize:".65rem",letterSpacing:".12em",textTransform:"uppercase",color:"#b8c8a8",marginBottom:".75rem"}},"Active Shifts for "+eSec),
-              React.createElement("div",{style:{display:"flex",flexWrap:"wrap",gap:".5rem"}},
-                SHIFTS.map(function(sh){
-                  const on=eEnabled[sh]!==false;
-                  return React.createElement("button",{key:sh,style:{padding:".5rem 1rem",borderRadius:".625rem",fontSize:".8rem",fontWeight:"500",border:"1px solid "+(on?"#c8ddb8":"#263826"),background:on?"#c8ddb8":"transparent",color:on?"#0a130a":"#4d6848",cursor:"pointer"},onClick:function(){toggleShiftEnabled(eLoc,eSec,sh);}},sh);
-                })
-              )
-            ):null}
-
-            {eSec?React.createElement("div",null,
-              React.createElement("div",{style:Object.assign({},st.chipRow,{marginBottom:"1rem"})},SHIFTS.map(function(sh){return React.createElement(Chip,{key:sh,label:sh,active:eShift===sh,onClick:function(){setEShift(sh);}});})),
-              React.createElement("div",{style:{marginBottom:".75rem"}},
-                eTasks.map(function(task,i){return React.createElement(EditTaskRow,{key:i,task:task,idx:i,
-                  onUpdateText:function(idx,text){updateTaskText(eLoc,eSec,eShift,idx,text);},
-                  onTogglePhoto:function(idx){toggleTaskPhoto(eLoc,eSec,eShift,idx);},
-                  onRemove:function(idx){removeTask(eLoc,eSec,eShift,idx);}
-                });})
-              ),
-              React.createElement("button",{style:st.addBtn,onClick:function(){addTask(eLoc,eSec,eShift);}}, "+ Add task")
-            ):React.createElement("p",{style:{fontSize:".8rem",color:"#b8c8a8",textAlign:"center",padding:"1rem 0"}},"No sections yet — add one above.")}
-          </div>
-        ):null}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   return null;
 }
@@ -826,10 +1086,8 @@ function App(){
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App,null));
 </script>
 <script>
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", function() {
-      navigator.serviceWorker.register("sw.js");
-    });
+  if("serviceWorker"in navigator){
+    window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js");});
   }
 </script>
 </body>
